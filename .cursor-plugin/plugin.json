@@ -1,6 +1,7 @@
 {
   "name": "persistent-memory",
   "displayName": "Persistent Memory",
+  "logo": "./logo.svg",
   "version": "1.0.0",
   "description": "Session-level persistent memory: saves structured summaries to ~/.cursor/persistent-memory/ (shared across projects). Stop hook or /persistent-memory-save triggers updates; /persistent-memory-retrieve loads past summaries.",
   "author": {
@@ -8,6 +9,8 @@
     "email": "liuxianzhu0221@gmail.com"
   },
   "license": "MIT",
+  "repository": "https://github.com/xianzhu21/persistent-memory",
+  "homepage": "https://github.com/xianzhu21/persistent-memory",
   "keywords": [
     "persistent-memory",
     "session-summary",
