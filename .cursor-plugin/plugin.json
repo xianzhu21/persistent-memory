@@ -1,7 +1,7 @@
 {
   "name": "persistent-memory",
   "displayName": "Persistent Memory",
-  "logo": "./logo.svg",
+  "logo": "logo.svg",
   "version": "1.0.0",
   "description": "Cursor keeps chat history on each machine, so it doesn't sync. When you switch devices (or use multiple clients on the same remote), the AI loses prior context. This plugin saves structured session summaries (decisions, findings, files changed) to ~/.cursor/persistent-memory/. In a new session, run /persistent-memory-retrieve to load a past summary and restore context. Use git on the folder to sync summaries across devices.",
   "author": {

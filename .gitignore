@@ -1,6 +1,5 @@
-# Runtime state
-.cursor/hooks/state/
-.cursor/plugins/
+# Runtime state (Cursor workspace data)
+.cursor/
 
 # Dependencies
 node_modules/
