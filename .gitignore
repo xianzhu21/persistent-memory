@@ -1,0 +1,23 @@
+# Runtime state
+.cursor/hooks/state/
+.cursor/plugins/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Logs and temp
+*.log
+.tmp/
+.cache/
+
+# OS and IDE
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+*~

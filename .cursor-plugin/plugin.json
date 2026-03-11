@@ -1,0 +1,21 @@
+{
+  "name": "persistent-memory",
+  "displayName": "Persistent Memory",
+  "version": "1.0.0",
+  "description": "Session-level persistent memory: saves structured summaries to ~/.cursor/persistent-memory/ (shared across projects). Stop hook triggers persistent-memory-save; use /persistent-memory-retrieve to load past summaries.",
+  "author": {
+    "name": "Xianzhu21",
+    "email": "liuxianzhu0221@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "persistent-memory",
+    "session-summary",
+    "agent-memory",
+    "transcripts",
+    "hooks",
+    "recall"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
+}
