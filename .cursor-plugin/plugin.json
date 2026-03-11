@@ -2,7 +2,7 @@
   "name": "persistent-memory",
   "displayName": "Persistent Memory",
   "version": "1.0.0",
-  "description": "Session-level persistent memory: saves structured summaries to ~/.cursor/persistent-memory/ (shared across projects). Stop hook triggers persistent-memory-save; use /persistent-memory-retrieve to load past summaries.",
+  "description": "Session-level persistent memory: saves structured summaries to ~/.cursor/persistent-memory/ (shared across projects). Stop hook or /persistent-memory-save triggers updates; /persistent-memory-retrieve loads past summaries.",
   "author": {
     "name": "Xianzhu21",
     "email": "liuxianzhu0221@gmail.com"

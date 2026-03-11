@@ -1,6 +1,6 @@
 ---
 name: persistent-memory-retrieve
-description: When user types /persistent-memory-retrieve or /persistent-memory-retrieve #tag, read ~/.cursor/persistent-memory/index.md, show recent session list (optionally filtered by tag), let user select, then load full summary into context.
+description: When user types /persistent-memory-retrieve or /persistent-memory-retrieve #tag, read ~/.cursor/persistent-memory/sessions.md, show recent session list (optionally filtered by tag), let user select, then load full summary into context.
 ---
 
 # Persistent Memory Retrieve
@@ -9,7 +9,7 @@ Browse and load past session summaries into the current context. Use when the us
 
 ## Workflow
 
-1. **Read index** from `~/.cursor/persistent-memory/index.md`
+1. **Read session list** from `~/.cursor/persistent-memory/sessions.md`
 2. **Parse lines** – format: `{id_prefix} | {timestamp} | {title} | {tags}`
 3. **Filter** – if user provided a tag (e.g. `/persistent-memory-retrieve #surfaceflinger`), show only lines whose `{tags}` contain that tag (case-insensitive match)
 4. **Display** – show last N entries (default 15) as a numbered list:
@@ -24,13 +24,13 @@ Browse and load past session summaries into the current context. Use when the us
 
 ## Matching ID to File
 
-- Index lines use first 8 chars of conversation_id (e.g. `a3f1b2c4`)
+- Session list lines use first 8 chars of conversation_id (e.g. `a3f1b2c4`)
 - Summary files are named `{full_conversation_id}.md`
-- To resolve: list `~/.cursor/persistent-memory/*.md`, find file whose stem (filename without .md) starts with the id_prefix. If multiple, pick by mtime or include all.
+- To resolve: list `~/.cursor/persistent-memory/*.md` **excluding** `sessions.md`, find file whose stem (filename without .md) starts with the id_prefix. If multiple match, pick the most recent by file mtime.
 
-## When Index is Empty
+## When Session List is Empty
 
-If `index.md` does not exist or is empty:
+If `sessions.md` does not exist or is empty:
 
 ```
 No session memories found. Summaries are created automatically when you have longer conversations (triggered by the persistent-memory Stop hook via persistent-memory-save).
