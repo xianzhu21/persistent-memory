@@ -10,11 +10,11 @@ Browse and load past session summaries into the current context. Use when the us
 ## Workflow
 
 1. **Read session list** from `~/.cursor/persistent-memory/sessions.md`
-2. **Parse lines** – format: `{id_prefix} | {timestamp} | {title} | {tags}`
+2. **Parse lines** – format: `{id_prefix} | {start} | {end} | {title} | {tags}` (5 fields) or legacy `{id_prefix} | {end} | {title} | {tags}` (4 fields). If 4 fields, treat the single timestamp as end only.
 3. **Filter** – if user provided a tag (e.g. `/persistent-memory-retrieve #surfaceflinger`), show only lines whose `{tags}` contain that tag (case-insensitive match)
-4. **Display** – show last N entries (default 15) as a numbered list:
+4. **Display** – show last N entries (default 15) as a numbered list. For 5-field lines show `start–end`; for 4-field legacy show the single timestamp:
    ```
-   1. 2026-03-10T2345 | SurfaceFlinger relative parent crash | #surfaceflinger #parallel-refresh
+   1. 2026-03-10T2215–2345 | SurfaceFlinger relative parent crash | #surfaceflinger #parallel-refresh
    2. 2026-03-10T1820 | TaskSnapshot NPE monkey test | #systemui #tasksnap
    ...
    ```

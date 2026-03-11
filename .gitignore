@@ -1,5 +1,6 @@
 # Runtime state (Cursor workspace data)
 .cursor/
+AGENTS.md
 
 # Dependencies
 node_modules/

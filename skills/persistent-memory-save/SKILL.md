@@ -26,6 +26,8 @@ When the user types `/persistent-memory-save` (no followup_message): locate the 
 
 ## Output Format
 
+**This format is MANDATORY. Treat it as an API contract. The summary file in `~/.cursor/persistent-memory/{conversation_id}.md` MUST follow this section structure. Do not replace it with free-form bullets.**
+
 Write the summary to `~/.cursor/persistent-memory/{conversation_id}.md`:
 
 ```markdown
@@ -69,6 +71,7 @@ Branch, remote, last push if mentioned. Omit if not relevant.
 ```
 
 - **Headings**: Top-level title uses #; section headers use ##. Omit section headers that have no content.
+- **Minimal required sections** (when time or context is constrained): at least keep `# title` + `## Summary` + `## Tags`. Other sections MAY be omitted only if there is genuinely no information for them.
 - Use lowercase tags with hyphens (e.g. `#surfaceflinger`, `#parallel-refresh`). Infer from conversation content.
 - **Merge rule**: Read existing summary first. When new content contradicts prior (e.g. "we switched from A to B", "that finding was wrong"), **annotate the old item** (e.g. add "—superseded by B", "—invalidated") rather than deleting; keeps change history. Append net-new items. Deduplicate. New sections (e.g. References, Errors & workarounds) may appear in incremental merge when content exists; add them if absent. Update Summary to reflect the full conversation.
 
@@ -97,9 +100,16 @@ File: `~/.cursor/persistent-memory/incremental-index.json`
 
 File: `~/.cursor/persistent-memory/sessions.md`
 
-Each line: `{conversation_id[:8]} | {YYYY-MM-DDTHHMM} | {title} | {tags}`
+Each line: `{conversation_id[:8]} | {start} | {end} | {title} | {tags}`
 
-- **Timestamp**: When the followup_message provides an explicit timestamp (e.g. "Use this exact timestamp `2026-03-11T1446`"), use that value. Do not generate your own timestamp.
+- **End timestamp**: When the followup_message provides an explicit timestamp (e.g. "Use this exact timestamp `2026-03-11T1446`"), use that value as `end`. Do not generate your own in that case. When no timestamp is provided (manual `/persistent-memory-save`), run `date +%Y-%m-%dT%H%M` in shell to get the current local time as `end`.
+- **Start timestamp**: Get session start from transcript file birth time (cross-platform).
+  - **Bash/sh** (Linux, macOS, Git Bash on Windows):
+    `birth=$(case "$(uname -s)" in Linux|MINGW*|MSYS*) stat -c %W "$transcript_path" ;; Darwin) stat -f %B "$transcript_path" ;; *) echo 0 ;; esac 2>/dev/null)`
+    `[ -n "$birth" ] && [ "$birth" != "0" ] && (case "$(uname -s)" in Linux|MINGW*|MSYS*) date -d @$birth +%Y-%m-%dT%H%M ;; Darwin) date -r $birth +%Y-%m-%dT%H%M ;; *) exit 1 ;; esac)`
+  - **PowerShell** (Windows): if the above fails (e.g. uname/stat not found), run:
+    `(Get-Item -LiteralPath "$transcript_path" -ErrorAction SilentlyContinue).CreationTime.ToString('yyyy-MM-ddTHHmm')`
+  - If the result is empty, use `end` as `start`.
 - Upsert: If a line starting with `{conversation_id[:8]}` exists, replace it. Otherwise prepend (newest at top).
 
 ## Transcript Parsing

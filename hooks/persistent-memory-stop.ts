@@ -200,7 +200,7 @@ function getFollowupMessage(
     `Only process transcript lines from line index ${startLine} to ${totalLines - 1} (0-based, ${totalLines - startLine} new lines). ` +
     `Read existing summary if present, extract from the new lines, merge (append and dedupe); do not truncate or drop prior content. ` +
     `Write merged summary to \`~/.cursor/persistent-memory/{conversation_id}.md\`. ` +
-    `Update \`~/.cursor/persistent-memory/sessions.md\` with line: \`${conversationId.slice(0, 8)} | ${timestamp} | {title} | {tags}\`. Use this exact timestamp \`${timestamp}\` (do not generate your own). For the summary file header \`# {timestamp} | {title}\`, use \`${timestampHeader}\`. ` +
+    `Update \`~/.cursor/persistent-memory/sessions.md\` with line: \`${conversationId.slice(0, 8)} | {start} | ${timestamp} | {title} | {tags}\`. Get \`start\` from transcript birth time (cross-platform: Linux/Git Bash \`stat -c %W\`, macOS \`stat -f %B\`, Windows PowerShell \`(Get-Item -LiteralPath path).CreationTime.ToString('yyyy-MM-ddTHHmm')\`; if empty use \`${timestamp}\`). Use \`end\` = \`${timestamp}\` (do not generate your own). For the summary file header \`# {timestamp} | {title}\`, use \`${timestampHeader}\`. ` +
     `Update \`~/.cursor/persistent-memory/incremental-index.json\`: set \`conversations["${conversationId}"].lastProcessedLineCount\` = ${totalLines} and \`lastProcessedAt\` = \`${new Date().toISOString()}\`. ` +
     `Use grep to find existing index line by ID prefix and replace; prepend if not found. ` +
     `If transcript is empty or unreadable, respond: No session summary generated.`
