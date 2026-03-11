@@ -19,6 +19,12 @@
     "hooks",
     "recall"
   ],
+  "category": "developer-tools",
+  "tags": [
+    "automation",
+    "memory",
+    "transcripts"
+  ],
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json"
 }

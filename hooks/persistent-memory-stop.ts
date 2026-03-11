@@ -170,6 +170,20 @@ function getTranscriptLineCount(path: string | null | undefined): number {
   }
 }
 
+function formatSessionsTimestamp(d: Date): string {
+  return (
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` +
+    `T${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`
+  );
+}
+
+function toHeaderFormat(compact: string): string {
+  if (compact.length >= 13) {
+    return `${compact.slice(0, 11)}${compact.slice(11, 13)}:${compact.slice(13)}`;
+  }
+  return compact;
+}
+
 function getFollowupMessage(
   conversationId: string,
   transcriptPath: string | null | undefined,
@@ -177,6 +191,8 @@ function getFollowupMessage(
   totalLines: number
 ): string {
   const tpath = transcriptPath ?? "";
+  const timestamp = formatSessionsTimestamp(new Date());
+  const timestampHeader = toHeaderFormat(timestamp);
   return (
     `Run the \`persistent-memory-save\` skill now. ` +
     `Process the current transcript at ${JSON.stringify(tpath)}, conversation_id ${JSON.stringify(conversationId)}. ` +
@@ -184,7 +200,7 @@ function getFollowupMessage(
     `Only process transcript lines from line index ${startLine} to ${totalLines - 1} (0-based, ${totalLines - startLine} new lines). ` +
     `Read existing summary if present, extract from the new lines, merge (append and dedupe); do not truncate or drop prior content. ` +
     `Write merged summary to \`~/.cursor/persistent-memory/{conversation_id}.md\`. ` +
-    `Update \`~/.cursor/persistent-memory/sessions.md\` with line: \`{conversation_id[:8]} | {timestamp} | {title} | {tags}\`. ` +
+    `Update \`~/.cursor/persistent-memory/sessions.md\` with line: \`${conversationId.slice(0, 8)} | ${timestamp} | {title} | {tags}\`. Use this exact timestamp \`${timestamp}\` (do not generate your own). For the summary file header \`# {timestamp} | {title}\`, use \`${timestampHeader}\`. ` +
     `Update \`~/.cursor/persistent-memory/incremental-index.json\`: set \`conversations["${conversationId}"].lastProcessedLineCount\` = ${totalLines} and \`lastProcessedAt\` = \`${new Date().toISOString()}\`. ` +
     `Use grep to find existing index line by ID prefix and replace; prepend if not found. ` +
     `If transcript is empty or unreadable, respond: No session summary generated.`

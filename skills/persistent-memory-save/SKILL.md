@@ -99,6 +99,7 @@ File: `~/.cursor/persistent-memory/sessions.md`
 
 Each line: `{conversation_id[:8]} | {YYYY-MM-DDTHHMM} | {title} | {tags}`
 
+- **Timestamp**: When the followup_message provides an explicit timestamp (e.g. "Use this exact timestamp `2026-03-11T1446`"), use that value. Do not generate your own timestamp.
 - Upsert: If a line starting with `{conversation_id[:8]}` exists, replace it. Otherwise prepend (newest at top).
 
 ## Transcript Parsing
