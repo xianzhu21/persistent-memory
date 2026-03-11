@@ -3,7 +3,7 @@
   "displayName": "Persistent Memory",
   "logo": "./logo.svg",
   "version": "1.0.0",
-  "description": "Session-level persistent memory: saves structured summaries to ~/.cursor/persistent-memory/ (shared across projects). Stop hook or /persistent-memory-save triggers updates; /persistent-memory-retrieve loads past summaries.",
+  "description": "Cursor keeps chat history on each machine, so it doesn't sync. When you switch devices (or use multiple clients on the same remote), the AI loses prior context. This plugin saves structured session summaries (decisions, findings, files changed) to ~/.cursor/persistent-memory/. In a new session, run /persistent-memory-retrieve to load a past summary and restore context. Use git on the folder to sync summaries across devices.",
   "author": {
     "name": "Xianzhu21",
     "email": "liuxianzhu0221@gmail.com"
