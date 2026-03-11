@@ -28,6 +28,23 @@ curl -fsSL https://bun.sh/install | bash
 - **persistent-memory-save** – Reads the transcript (JSONL), generates a structured summary, writes to `~/.cursor/persistent-memory/{conversation_id}.md`, updates `index.md`.
 - **persistent-memory-retrieve** – User types `/persistent-memory-retrieve` or `/persistent-memory-retrieve #tag` to browse and load past summaries.
 
+## Retrieve example
+
+```
+> /persistent-memory-retrieve
+
+1. 2026-03-11T1215 | Persistent-memory plugin refactor | #persistent-memory #cursor
+2. 2026-03-10T1820 | SurfaceFlinger layer debugging | #surfaceflinger
+3. 2026-03-09T1430 | Notion MCP integration | #notion #mcp
+
+Reply with a number (1–3) to load that session, or "all" to load all.
+
+> 2
+[Summary of session 2 is loaded into context]
+```
+
+Filter by tag: `/persistent-memory-retrieve #surfaceflinger` shows only sessions with that tag.
+
 ## Storage
 
 | Path | Purpose |
