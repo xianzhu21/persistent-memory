@@ -123,10 +123,12 @@ Each line: `{conversation_id[:8]} | {start} | {end} | {title} | {tags}`
 
 ## When to Skip
 
-If the transcript is empty, unreadable, or contains no substantive content (and no existing summary to keep), respond:
+**Empty or unreadable transcript:** If the transcript is empty or unreadable, respond: `No session summary generated.` Do not create empty files.
 
-```
-No session summary generated.
-```
+**No substantive content (index-only update):** If the processed lines have no substantive content—e.g. only a single command invocation (e.g. `/persistent-memory-retrieve`), a list/UI response, and "awaiting user input"—with no decisions, findings, code edits, or real discussion:
 
-Do not create empty files.
+- **Do not** write or update `~/.cursor/persistent-memory/{conversation_id}.md`.
+- **Do not** add or update a line in `sessions.md` for this conversation.
+- **Do** update `incremental-index.json` only: set `conversations["{conversation_id}"].lastProcessedLineCount` and `lastProcessedAt` so the next run knows how much was processed.
+
+Then respond: `No session summary generated (no substantive content); index updated.`
