@@ -19,14 +19,14 @@ Browse and load past session summaries into the current context. Use when the us
    ...
    ```
 5. **User selects** – user replies with a number (e.g. "1") or "all" for multiple
-6. **Load** – for each selected item, read `~/.cursor/persistent-memory/{conversation_id}.md` (use id_prefix to match – if multiple match, take most recent). If id_prefix is 8 chars, match files whose name starts with that prefix
+6. **Load** – for each selected item, read `~/.cursor/persistent-memory/summaries/{conversation_id}.md` (use id_prefix to match – if multiple match, take most recent). If id_prefix is 8 chars, match files whose name starts with that prefix
 7. **Inject** – output the full summary content and instruct: "The above session summary has been loaded. You may use it as context for the current task."
 
 ## Matching ID to File
 
 - Session list lines use first 8 chars of conversation_id (e.g. `a3f1b2c4`)
 - Summary files are named `{full_conversation_id}.md`
-- To resolve: list `~/.cursor/persistent-memory/*.md` **excluding** `sessions.md`, find file whose stem (filename without .md) starts with the id_prefix. If multiple match, pick the most recent by file mtime.
+- To resolve: list `~/.cursor/persistent-memory/summaries/*.md`, find file whose stem (filename without .md) starts with the id_prefix. If multiple match, pick the most recent by file mtime.
 
 ## When Session List is Empty
 

@@ -37,7 +37,7 @@ curl -fsSL https://bun.sh/install | bash
 ## How it works
 
 - **Stop hook** – On eligible session ends, emits a `followup_message` that triggers the `persistent-memory-save` skill.
-- **persistent-memory-save** – Incrementally updates the summary (like continual-learning): only processes new transcript lines, merges with existing (reconciling contradictions). Triggered by Stop hook, or manually via `/persistent-memory-save`. Writes to `~/.cursor/persistent-memory/{conversation_id}.md`, updates `sessions.md` and `incremental-index.json`.
+- **persistent-memory-save** – Incrementally updates the summary (like continual-learning): only processes transcripts that are new or modified (file mtime), merges with existing (reconciling contradictions). Triggered by Stop hook, or manually via `/persistent-memory-save`. Writes to `~/.cursor/persistent-memory/summaries/{conversation_id}.md`, updates `sessions.md` and `incremental-index.json`.
 - **persistent-memory-retrieve** – User types `/persistent-memory-retrieve` or `/persistent-memory-retrieve #tag` to browse and load past summaries.
 
 ## Retrieve example
@@ -61,10 +61,12 @@ Filter by tag: `/persistent-memory-retrieve #surfaceflinger` shows only sessions
 
 | Path | Purpose |
 |------|---------|
-| `~/.cursor/persistent-memory/` | Session summaries (`{id}.md`), `sessions.md` (session list), `incremental-index.json` (processing progress), `incremental-index-YYYY-MM-DDTHHMMSS.json` (archive snapshots) |
+| `~/.cursor/persistent-memory/` | `sessions.md` (session list), `incremental-index.json` (processing progress), `incremental-index-YYYY-MM-DDTHHMMSS.json` (archive snapshots) |
+| `~/.cursor/persistent-memory/summaries/` | Session summaries (`{conversation_id}.md`) |
+| `~/.cursor/persistent-memory/transcripts/` | Compressed raw transcripts (`{conversation_id}.jsonl.gz`), updated when a summary is written; enables cross-device lookup of original dialogue |
 | `.cursor/hooks/state/persistent-memory.json` | Per-workspace state (turns, last run) |
 
-**Archiving**: When `incremental-index.json` has ≥500 conversations (configurable), the oldest 80% are moved to a timestamped archive file. Each run creates a new file (e.g. `incremental-index-2025-03-11T143052.json`). The save skill consults both the main index and archives when looking up `lastProcessedLineCount`.
+**Archiving**: When `incremental-index.json` has ≥500 transcript entries (configurable), the oldest 80% are moved to a timestamped archive file. Each run creates a new file (e.g. `incremental-index-2025-03-11T143052.json`). The save skill consults both the main index and archives when looking up `mtimeMs` per transcript path.
 
 **Sync across devices with git**: Initialize `~/.cursor/persistent-memory/` as a git repo and push to a remote. Pull on other machines to keep summaries in sync—works even when devices don't share the same SSH server.
 
@@ -92,7 +94,7 @@ A *turn* is one completed user message plus one assistant reply (status=complete
 | `PERSISTENT_MEMORY_TRIAL_MIN_TURNS` | Min turns in trial | 3 |
 | `PERSISTENT_MEMORY_TRIAL_MIN_MINUTES` | Min minutes in trial | 15 |
 | `PERSISTENT_MEMORY_TRIAL_DURATION_MINUTES` | Trial window length | 1440 (24h) |
-| `PERSISTENT_MEMORY_ARCHIVE_COUNT` | Archive when conversations ≥ this | 500 |
+| `PERSISTENT_MEMORY_ARCHIVE_COUNT` | Archive when transcript entries ≥ this | 500 |
 
 ## License
 
