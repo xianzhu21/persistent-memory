@@ -11,9 +11,10 @@ Browse and load past session summaries into the current context. Use when the us
 
 1. **Read session list** from `~/.cursor/persistent-memory/sessions.md`
 2. **Parse lines** – format: `{id_prefix} | {start} | {end} | {title} | {tags}` (5 fields) or legacy `{id_prefix} | {end} | {title} | {tags}` (4 fields). If 4 fields, treat the single timestamp as end only.
-3. **Filter** – treat everything after `/persistent-memory-retrieve` as a natural-language query (sentence or phrase). **Semantic filtering:** interpret the user's intent and include only sessions whose `{title}`, `{tags}`, or summary content is semantically relevant. E.g. "SF crash we investigated before" → SurfaceFlinger crash/investigation sessions; "Cursor pricing" → Cursor pricing; "gerrit commits" → Gerrit commit/CL sessions. Use meaning, not just keyword substring match. If no query, show all.
-4. **Sort** – resolve each line's `{id_prefix}` to the summary file path under `~/.cursor/persistent-memory/summaries/`; sort by summary file modification time descending (newest first).
-5. **Display** – show top N entries (default 15) as a **Markdown table** so it renders in chat. Include header and separator:
+3. **Parse limit** – if the query ends with a number (e.g. `30` or `50`), use it as N; otherwise N = 15. E.g. `persistent-memory-retrieve SF 30` → query = "SF", N = 30; `persistent-memory-retrieve 30` → query = "", N = 30.
+4. **Filter** – treat the remainder as a natural-language query (sentence or phrase). **Semantic filtering:** interpret the user's intent and include only sessions whose `{title}`, `{tags}`, or summary content is semantically relevant. E.g. "SF crash we investigated before" → SurfaceFlinger crash/investigation sessions; "Cursor pricing" → Cursor pricing; "gerrit commits" → Gerrit commit/CL sessions. Use meaning, not just keyword substring match. If no query, show all.
+5. **Sort** – resolve each line's `{id_prefix}` to the summary file path under `~/.cursor/persistent-memory/summaries/`; sort by summary file modification time descending (newest first).
+6. **Display** – show top N entries (default 15) as a **Markdown table** so it renders in chat. Include header and separator:
    ```
    | # | ID | Time | Title | Tags |
    | --- | --- | --- | --- | --- |
@@ -21,10 +22,15 @@ Browse and load past session summaries into the current context. Use when the us
    | 2 | 7d8e9f0a | 2026-03-10T1820 | TaskSnapshot NPE monkey test | #systemui #tasksnap |
    ...
    ```
-   For 5-field lines show `start–end` in the Time column; for 4-field legacy show the single timestamp only.
-6. **User selects** – user replies with a number (e.g. "1") or "all" for multiple
-7. **Load** – for each selected item, read `~/.cursor/persistent-memory/summaries/{conversation_id}.md` (use id_prefix to match – if multiple match, take most recent). If id_prefix is 8 chars, match files whose name starts with that prefix
-8. **Inject** – output the full summary content and instruct: "The above session summary has been loaded. You may use it as context for the current task."
+   For 5-field lines show `start–end` in the Time column; for 4-field legacy show the single timestamp only. **Optional limit:** if the user ends the query with a number (e.g. `persistent-memory-retrieve 30` or `persistent-memory-retrieve SF 50`), use that as N.
+   **When total > N:** after the table, append: *"Showing top N of {total} sessions. Reply with a number (1–N) to load one, 'all' to load all shown, or a larger number / 'more' to show more entries."*
+7. **User reply** – interpret as follows:
+   - **Number 1..N** → load that session (go to Load step)
+   - **"all"** → load all shown sessions
+   - **Number > N** (e.g. "30" when N=15) **or "more"** → show more: re-display with that limit (or N+15 for "more"). Then prompt again.
+   - Alternatively, the user may add a limit in the command: `/persistent-memory-retrieve [query] 30`
+8. **Load** – for each selected item, read `~/.cursor/persistent-memory/summaries/{conversation_id}.md` (use id_prefix to match – if multiple match, take most recent). If id_prefix is 8 chars, match files whose name starts with that prefix
+9. **Inject** – output the full summary content and instruct: "The above session summary has been loaded. You may use it as context for the current task."
 
 ## Matching ID to File
 
