@@ -105,8 +105,8 @@ Branch, remote. Omit if not relevant.
 - Use `##` for sections; omit sections with no content. At minimum keep `# title`, `## Summary`, `## Transcript` (with archive path), `## Tags`. **NEVER omit** `## Transcript` — it points to the `.jsonl.gz` for retrieval. **NEVER omit `## Transcript`** — it must contain the archive path. **NEVER omit `## Transcript`** — it must contain the archive path so `persistent-memory-retrieve` can load the raw transcript.
 - **Title:** Write a descriptive title (typically 2–4 clauses, ~40–80 chars total) so similar sessions are distinguishable. Include: main topic, key outcome or artifact, and a distinguishing detail (e.g. module/file name, Gerrit topic). Avoid terse one-liners; prefer specifics (e.g. "SurfaceFlinger parallel_refresh RE log analysis, drawSummary fix" vs "SF log analysis").
 - In `## Transcript`, replace `{conversation_id}` with the actual conversation id for this session.
-- Use lowercase tags with hyphens (e.g. `#surfaceflinger`, `#parallel-refresh`).
-- **Merge rule:** Read existing summary first; append and dedupe; annotate superseded/invalidated items instead of deleting.
+- **Tags:** Select the **most relevant** tags for retrieval—**at most 3**. Use lowercase with hyphens (e.g. `#surfaceflinger`, `#parallel-refresh`). Prioritize topic/domain, key technology, and distinctive outcome. **Re-evaluate on every run:** when processing a transcript (including re-reads), derive tags from the **full** transcript content; do not carry over or merge old tags.
+- **Merge rule:** Read existing summary first; append and dedupe; annotate superseded/invalidated items instead of deleting. **Exception:** Tags are re-derived from full content each time, not merged.
 
 ## Incremental Index
 
@@ -152,6 +152,7 @@ Each line: `{conversation_id[:8]} | {start} | {end} | {title} | {tags}`
 - **Title:** Same as the summary heading; must be descriptive enough to distinguish from similar sessions (see Output Format).
 - **Start:** Transcript file birth time (e.g. `stat -c %W` on Linux, `stat -f %B` on macOS; format `YYYY-MM-DDTHHMM`). If unavailable, use end.
 - **End:** Current time when saving, format `YYYY-MM-DDTHHMM`.
+- **Tags:** Same as the summary `## Tags`; at most 3 most relevant (see Output Format).
 - Upsert: replace line starting with `{conversation_id[:8]}` or prepend if missing (newest at top).
 
 ## Transcript Parsing
