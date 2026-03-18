@@ -1,6 +1,6 @@
 ---
 name: persistent-memory-save
-description: When triggered by Stop hook or /persistent-memory-save, incrementally update session summaries from the current project's transcripts; merge and write to ~/.cursor/persistent-memory/summaries/{conversation_id}.md and update sessions.md. No extra context required.
+description: When triggered by Stop hook or /persistent-memory-save, incrementally update session summaries from the current project's transcripts; merge and write to ~/.cursor/persistent-memory/summaries/{conversation_id}.md, create transcript archive at transcripts/{id}.jsonl.gz, and update sessions.md. No extra context required.
 ---
 
 # Persistent Memory Save
@@ -36,19 +36,31 @@ No `conversation_id` or `transcript_path` from outside—discover everything fro
    - Read the **full** transcript file. Derive `conversation_id` from the path (e.g. parent dir name or filename without `.jsonl`).
    - Read existing summary from `~/.cursor/persistent-memory/summaries/{conversation_id}.md` if present.
    - Parse the transcript JSONL; extract text from `content` (type `"text"` → `text`).
-   - If the content contains **substantive content** (decisions, findings, edits, references, etc.): ensure `~/.cursor/persistent-memory/summaries/` exists (`mkdir -p`), merge (append new bullets, dedupe; when new content contradicts old, annotate the old e.g. "—superseded by …"), then **write** merged summary to `~/.cursor/persistent-memory/summaries/{conversation_id}.md` (see Output Format). **Then archive the raw transcript** (see Transcript Archive): compress the source `.jsonl` with gzip and write to `~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz` (overwrites if exists). Do **not** add an "incremental update … no new decisions/findings" line to the summary when there is no substantive content.
+   - If the content contains **substantive content** (decisions, findings, edits, references, etc.): perform **all three** of the following **in order** (never skip any):
+     1. `mkdir -p ~/.cursor/persistent-memory/summaries ~/.cursor/persistent-memory/transcripts`
+     2. **Write** merged summary to `~/.cursor/persistent-memory/summaries/{conversation_id}.md` — the file MUST include a `## Transcript` section with:
+        `~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz` — raw transcript (gzip). Load with `gzip -dc <path>`.
+     3. **Archive transcript:** `gzip -c "<absolute_path_to_transcript.jsonl>" > ~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`
+     (Merge rules: append new bullets, dedupe; when new content contradicts old, annotate the old e.g. "—superseded by …". Do **not** add an "incremental update … no new decisions/findings" line when there is no substantive content.)
    - If the content has **no substantive content** (e.g. only a single command, no decisions/findings/edits): do **not** write or update the summary file; do **not** add/update this conversation in sessions.md; do **not** archive the transcript.
+- **Low-value command-only runs are non-substantive by default:** if the conversation is primarily executing `/persistent-memory-save` or `/persistent-memory-retrieve` and does **not** modify persistent-memory implementation or skills, treat it as no substantive content. In this case, do **not** write/update summary, do **not** update sessions.md, and do **not** archive transcript.
+- **Exception (recordable):** if the same conversation includes meaningful changes to persistent-memory behavior (for example `skills/persistent-memory-save/SKILL.md`, `skills/persistent-memory-retrieve/SKILL.md`, `hooks/persistent-memory-stop.ts`, plugin config, or related code/docs with decisions/findings), then it is substantive and should be summarized normally.
    - **Always** for this transcript (even when no substantive content): update `incremental-index.json` for the transcript’s **absolute path** with `mtimeMs` = current file mtime (ms since epoch), `lastProcessedAt` = current ISO timestamp. Only when a summary was **written** for this conversation: upsert `sessions.md` (line `{conversation_id[:8]} | {start} | {end} | {title} | {tags}`; end = current time when saving).
 
 5. **Write back**  
    Save `incremental-index.json` and `sessions.md` after processing. **CRITICAL:** If any transcripts were processed (including those with no substantive content), you MUST update and persist the index so the next run skips them until their file mtime changes. If no transcripts needed updates or all had no substantive content, respond exactly: `No session summary generated (no substantive content); index updated.`
+
+6. **Before completing**  
+   For each conversation for which you wrote a summary, verify:
+   - `summaries/{conversation_id}.md` exists and contains `## Transcript` with the correct path
+   - `transcripts/{conversation_id}.jsonl.gz` exists. If missing, run: `gzip -c "<abs_path_to_jsonl>" > ~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`
 
 ## Output Format
 
 **MANDATORY.** Each summary file `~/.cursor/persistent-memory/summaries/{conversation_id}.md` MUST follow this structure:
 
 ```markdown
-# {YYYY-MM-DDTHH:MM} | {Short title}
+# {YYYY-MM-DDTHH:MM} | {Descriptive title}
 
 ## Summary
 1–3 sentence summary of what was discussed and accomplished.
@@ -90,7 +102,8 @@ Branch, remote. Omit if not relevant.
 #tag1 #tag2 #tag3
 ```
 
-- Use `##` for sections; omit sections with no content. At minimum keep `# title`, `## Summary`, `## Transcript`, `## Tags`.
+- Use `##` for sections; omit sections with no content. At minimum keep `# title`, `## Summary`, `## Transcript` (with archive path), `## Tags`. **NEVER omit** `## Transcript` — it points to the `.jsonl.gz` for retrieval. **NEVER omit `## Transcript`** — it must contain the archive path. **NEVER omit `## Transcript`** — it must contain the archive path so `persistent-memory-retrieve` can load the raw transcript.
+- **Title:** Write a descriptive title (typically 2–4 clauses, ~40–80 chars total) so similar sessions are distinguishable. Include: main topic, key outcome or artifact, and a distinguishing detail (e.g. module/file name, Gerrit topic). Avoid terse one-liners; prefer specifics (e.g. "SurfaceFlinger parallel_refresh RE log analysis, drawSummary fix" vs "SF log analysis").
 - In `## Transcript`, replace `{conversation_id}` with the actual conversation id for this session.
 - Use lowercase tags with hyphens (e.g. `#surfaceflinger`, `#parallel-refresh`).
 - **Merge rule:** Read existing summary first; append and dedupe; annotate superseded/invalidated items instead of deleting.
@@ -120,7 +133,7 @@ Same shape as continual-learning index: key by transcript **absolute path**, tra
 
 Path: `~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`
 
-When a summary is **written** for a conversation, compress and save the raw transcript so it can be looked up after syncing across devices. Steps:
+**Tied to summary write:** Whenever you write `summaries/{conversation_id}.md`, you MUST also create the transcript archive (workflow step 4.3). Compress and save the raw transcript so it can be looked up after syncing across devices. Steps:
 
 1. Ensure the directory exists: `mkdir -p ~/.cursor/persistent-memory/transcripts/`
 2. Compress and write (overwrites if exists): `gzip -c <absolute_path_to_transcript.jsonl> > ~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`
@@ -136,6 +149,7 @@ sessions.md lists **conversations that have summary content** (i.e. a written `{
 
 Each line: `{conversation_id[:8]} | {start} | {end} | {title} | {tags}`
 
+- **Title:** Same as the summary heading; must be descriptive enough to distinguish from similar sessions (see Output Format).
 - **Start:** Transcript file birth time (e.g. `stat -c %W` on Linux, `stat -f %B` on macOS; format `YYYY-MM-DDTHHMM`). If unavailable, use end.
 - **End:** Current time when saving, format `YYYY-MM-DDTHHMM`.
 - Upsert: replace line starting with `{conversation_id[:8]}` or prepend if missing (newest at top).
@@ -150,5 +164,6 @@ Each line: `{conversation_id[:8]} | {start} | {end} | {title} | {tags}`
 
 - **Empty or unreadable transcript:** Do not create a summary file. Update index for that transcript path with current `mtimeMs` and `lastProcessedAt` = now; do not add/update that conversation in sessions.md.
 - **No substantive content** in the transcript (e.g. only a single command, no decisions/findings/edits): Do **not** write or update the summary file; do **not** add/update that conversation in sessions.md (sessions.md represents summary content). **Must still** update `incremental-index.json` for that transcript path (and save it in step 5) so the next run skips it until the file changes.
+- **Command-noise guard:** Treat pure `/persistent-memory-save` or `/persistent-memory-retrieve` execution logs as **no substantive content** unless the conversation also contains meaningful persistent-memory skill/code/config modifications or durable decisions/findings.
 
 If **no** transcripts needed updates or **all** fell into the skip cases above, respond exactly: `No session summary generated (no substantive content); index updated.`
