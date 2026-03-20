@@ -30,7 +30,9 @@ Browse and load past session summaries into the current context. Use when the us
    - **Number > N** (e.g. "30" when N=15) **or "more"** → show more: re-display with that limit (or N+15 for "more"). Then prompt again.
    - Alternatively, the user may add a limit in the command: `/persistent-memory-retrieve [query] 30`
 8. **Load** – for each selected item, read `~/.cursor/persistent-memory/summaries/{conversation_id}.md` (use id_prefix to match – if multiple match, take most recent). If id_prefix is 8 chars, match files whose name starts with that prefix
-9. **Inject** – output the full summary content and instruct: "The above session summary has been loaded. You may use it as context for the current task."
+9. **Inject** – **MUST** output the full summary content verbatim in chat first; **then** append the instruction line. Do **not** skip to the instruction without displaying the summary.
+   - First: paste the entire `{conversation_id}.md` file content (all sections: Summary, Workspace, Key paths, Transcript, Key findings, Decisions, References, Tags, etc.) into your response
+   - Second: add "The above session summary has been loaded. You may use it as context for the current task."
 
 ## Matching ID to File
 
@@ -45,6 +47,10 @@ If `sessions.md` does not exist or is empty:
 ```
 No session memories found. Summaries are created automatically when you have longer conversations (triggered by the persistent-memory Stop hook via persistent-memory-save).
 ```
+
+## Stub / thin summaries
+
+If a `summaries/{id}.md` file is only a **tooling placeholder** (e.g. "Batch save", "N text segments") while the gzip transcript is large and substantive, tell the user the summary is **out of date** and they should run **`/persistent-memory-save`** again from the **same workspace** where that chat lives (or **all projects**), so the save skill can **merge** real `## Key findings` / `## Decisions` from the full JSONL. Root cause is often **wrong transcript slug** (single-folder vs `.code-workspace`) — fixed in `persistent-memory-save` step 1.
 
 ## Examples
 
