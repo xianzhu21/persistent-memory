@@ -60,7 +60,7 @@ No `conversation_id` or `transcript_path` from outside—discover everything fro
 **MANDATORY.** Each summary file `~/.cursor/persistent-memory/summaries/{conversation_id}.md` MUST follow this structure:
 
 ```markdown
-# {YYYY-MM-DDTHH:MM} | {Descriptive title}
+# {start} | {end} | {Descriptive title}
 
 ## Summary
 1–3 sentence summary of what was discussed and accomplished.
@@ -103,7 +103,8 @@ Branch, remote. Omit if not relevant.
 ```
 
 - Use `##` for sections; omit sections with no content. At minimum keep `# title`, `## Summary`, `## Transcript` (with archive path), `## Tags`. **NEVER omit** `## Transcript` — it points to the `.jsonl.gz` for retrieval. **NEVER omit `## Transcript`** — it must contain the archive path. **NEVER omit `## Transcript`** — it must contain the archive path so `persistent-memory-retrieve` can load the raw transcript.
-- **Title:** Write a descriptive title (typically 2–4 clauses, ~40–80 chars total) so similar sessions are distinguishable. Include: main topic, key outcome or artifact, and a distinguishing detail (e.g. module/file name, Gerrit topic). Avoid terse one-liners; prefer specifics (e.g. "SurfaceFlinger parallel_refresh RE log analysis, drawSummary fix" vs "SF log analysis").
+- **Summary H1 — `{start}` and `{end}`:** Use the **same semantics and values** as the **Start** and **End** fields in `sessions.md` (see Session List Update). Format both as `YYYY-MM-DDTHHMM`. **`{start}`:** transcript `.jsonl` file birth time (e.g. `stat -c %W` on Linux, `stat -f %B` on macOS); if unavailable, use `{end}`. **`{end}`:** current time when writing/updating this summary. On incremental merges, keep `{start}` from the original transcript birth time; refresh `{end}` to the current save time.
+- **Descriptive title:** The third segment after `{start} | {end} |` (typically 2–4 clauses, ~40–80 chars total) so similar sessions are distinguishable. Include: main topic, key outcome or artifact, and a distinguishing detail (e.g. module/file name, Gerrit topic). Avoid terse one-liners; prefer specifics (e.g. "SurfaceFlinger parallel_refresh RE log analysis, drawSummary fix" vs "SF log analysis").
 - **Do not record save/retrieve as session themes:** Do **not** include `persistent-memory-save` or `persistent-memory-retrieve` in the title or Summary when they merely describe the user running those commands—they are meta-actions, not session themes. Focus on the actual work (e.g. "Daily summary yesterday (Mar 18), Logs 260318" not "...persistent-memory-save"). **Exception:** Only mention them when the session is *about* the skill/plugin (e.g. modifying SKILL.md, debugging save behavior, adding command-noise guard).
 - In `## Transcript`, replace `{conversation_id}` with the actual conversation id for this session.
 - **Tags:** Select the **most relevant** tags for retrieval—**at most 3**. Use lowercase with hyphens (e.g. `#surfaceflinger`, `#parallel-refresh`). Prioritize topic/domain, key technology, and distinctive outcome. **Re-evaluate on every run:** when processing a transcript (including re-reads), derive tags from the **full** transcript content; do not carry over or merge old tags.
@@ -150,9 +151,9 @@ sessions.md lists **conversations that have summary content** (i.e. a written `{
 
 Each line: `{conversation_id[:8]} | {start} | {end} | {title} | {tags}`
 
-- **Title:** Same as the summary heading; must be descriptive enough to distinguish from similar sessions (see Output Format).
-- **Start:** Transcript file birth time (e.g. `stat -c %W` on Linux, `stat -f %B` on macOS; format `YYYY-MM-DDTHHMM`). If unavailable, use end.
-- **End:** Current time when saving, format `YYYY-MM-DDTHHMM`.
+- **Start:** Transcript file birth time (e.g. `stat -c %W` on Linux, `stat -f %B` on macOS; format `YYYY-MM-DDTHHMM`). If unavailable, use end. Must match the **first** segment of the summary file H1 (`# {start} | {end} | …`).
+- **End:** Current time when saving, format `YYYY-MM-DDTHHMM`. Must match the **second** segment of the summary H1. On each summary update, set **End** to the new save time and refresh `{end}` in the H1 accordingly.
+- **Title:** The **descriptive title only**—the **third** segment of the summary H1 (not the full `#` line). Must be descriptive enough to distinguish from similar sessions (see Output Format).
 - **Tags:** Same as the summary `## Tags`; at most 3 most relevant (see Output Format).
 - Upsert: replace line starting with `{conversation_id[:8]}` or prepend if missing (newest at top).
 
