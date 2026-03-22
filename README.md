@@ -1,34 +1,38 @@
 # Persistent Memory
 
-Session-level persistent memory for Cursor. Saves structured summaries to `~/.cursor/persistent-memory/` (shared across all projects). Use `/persistent-memory-retrieve` to load past session summaries into the current context.
+Session-level persistent memory for Cursor. Saves structured summaries under `~/.cursor/persistent-memory/` (shared across projects on that machine). Run `/persistent-memory-retrieve` to browse and load past summaries into the current chat.
 
 ## Why
 
-Cursor stores chat history on each client. Switch devices and the AI loses context. Two common scenarios:
+Cursor keeps chat history per client. Switch devices and the model loses prior context. Two common setups:
 
-1. **Same remote, multiple clients** (e.g., two Macs SSH to one Ubuntu): Each client has its own local history—they never sync. Summaries are written to `~/.cursor/persistent-memory/` on the remote; because that path lives on the server, every client sees the same store.
+1. **Same remote, multiple clients** (e.g. two Macs SSH to one Linux host): Each client has its own local history; they do not sync. Summaries live in `~/.cursor/persistent-memory/` on the **server**, so every client that uses that home directory sees the same store.
 
-2. **Different devices, no shared server** (e.g., laptop and desktop, each running Cursor locally): Summaries live in each machine's home dir. Use git on `~/.cursor/persistent-memory/` to sync across devices; push from one, pull on another.
+2. **Different devices, no shared server**: Each machine has its own `~/.cursor/persistent-memory/`. Track that folder with git (or another sync tool): push from one device, pull on another.
 
-In both cases, run `/persistent-memory-retrieve` on the new device to load past summaries into context.
+After syncing or switching context, run `/persistent-memory-retrieve` (optionally with a natural-language query) to pull a summary back into context.
 
 Inspired by [Thinking about Coding Agent Persistent Memory](https://xianzhu21.notion.site/thinking-about-coding-agent-persistent-memory).
 
 ## Installation
 
-**From Marketplace** (once published):
+**Marketplace** (when published):
+
 ```bash
 /add-plugin persistent-memory
 ```
 
-**From source** (local development):
+**From source** (this repository root):
+
 ```bash
-/add-plugin /path/to/persistent-memory-plugin
+/add-plugin /path/to/persistent-memory
 ```
+
+Manifest: [`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json).
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) for running the Stop hook
+- [Bun](https://bun.sh/) — the Stop hook runs as `bun run …/hooks/persistent-memory-stop.ts`
 
 ```bash
 curl -fsSL https://bun.sh/install | bash
@@ -36,65 +40,79 @@ curl -fsSL https://bun.sh/install | bash
 
 ## How it works
 
-- **Stop hook** – On eligible session ends, emits a `followup_message` that triggers the `persistent-memory-save` skill.
-- **persistent-memory-save** – Incrementally updates the summary (like continual-learning): only processes transcripts that are new or modified (file mtime), merges with existing (reconciling contradictions). Triggered by Stop hook, or manually via `/persistent-memory-save`. Writes to `~/.cursor/persistent-memory/summaries/{conversation_id}.md`, updates `sessions.md` and `incremental-index.json`.
-- **persistent-memory-retrieve** – User types `/persistent-memory-retrieve` or `/persistent-memory-retrieve #tag` to browse and load past summaries.
+- **Stop hook** — On eligible session stops, prints a `followup_message` that tells the agent to run the `persistent-memory-save` skill. Skips if the same `generation_id` was already handled (avoids duplicate follow-ups).
+- **persistent-memory-save** — Incrementally processes **this workspace’s** transcripts under `~/.cursor/projects/<workspace-slug>/agent-transcripts/`, keyed by file mtime in `~/.cursor/persistent-memory/incremental-index.json`. Merges into `summaries/{conversation_id}.md`, gzips the raw JSONL to `transcripts/{conversation_id}.jsonl.gz`, updates `sessions.md`. Invoked by the hook or manually with `/persistent-memory-save`. Skips empty or non-substantive transcripts (see skill).
+- **persistent-memory-retrieve** — `/persistent-memory-retrieve` with optional **natural-language** filter (not only tags). Results are sorted by summary file mtime (newest first). Optional trailing number sets how many rows to show (default 15).
 
 ## Retrieve example
 
 ```
-> /persistent-memory-retrieve
+> /persistent-memory-retrieve surfaceflinger
 
-1. 2026-03-11T1215 | Persistent-memory plugin refactor | #persistent-memory #cursor
-2. 2026-03-10T1820 | SurfaceFlinger layer debugging | #surfaceflinger
-3. 2026-03-09T1430 | Notion MCP integration | #notion #mcp
+| # | ID | Time | Title | Tags |
+| --- | --- | --- | --- | --- |
+| 1 | a3f1b2c4 | 2026-03-10T2215–2345 | SF parallel_refresh RE log, drawSummary | #surfaceflinger #parallel-refresh |
+| 2 | 7d8e9f0a | 2026-03-09T1820 | Layer parent crash investigation | #surfaceflinger |
 
-Reply with a number (1–3) to load that session, or "all" to load all.
+Reply with a number (1–2) to load one, or "all" for all shown.
 
-> 2
-[Summary of session 2 is loaded into context]
+> 1
+[Full summary .md content appears in chat, then a short “loaded” line]
 ```
 
-Filter by tag: `/persistent-memory-retrieve #surfaceflinger` shows only sessions with that tag.
+- Filter by meaning: e.g. `/persistent-memory-retrieve gerrit commits we did last week` (semantic match on title, tags, and summary bodies).
+- Widen the list: `/persistent-memory-retrieve 30` or `/persistent-memory-retrieve SF 50` (number = row limit).
 
 ## Storage
 
 | Path | Purpose |
 |------|---------|
-| `~/.cursor/persistent-memory/` | `sessions.md` (session list), `incremental-index.json` (processing progress), `incremental-index-YYYY-MM-DDTHHMMSS.json` (archive snapshots) |
-| `~/.cursor/persistent-memory/summaries/` | Session summaries (`{conversation_id}.md`) |
-| `~/.cursor/persistent-memory/transcripts/` | Compressed raw transcripts (`{conversation_id}.jsonl.gz`), updated when a summary is written; enables cross-device lookup of original dialogue |
-| `.cursor/hooks/state/persistent-memory.json` | Per-workspace state (turns, last run) |
+| `~/.cursor/persistent-memory/sessions.md` | Index lines for conversations that have a written summary |
+| `~/.cursor/persistent-memory/incremental-index.json` | Per-transcript absolute path → `mtimeMs`, `lastProcessedAt` |
+| `~/.cursor/persistent-memory/incremental-index-*.json` | Optional **manual** snapshots; the save skill may consult them when merging index history |
+| `~/.cursor/persistent-memory/summaries/` | `{conversation_id}.md` structured summaries |
+| `~/.cursor/persistent-memory/transcripts/` | `{conversation_id}.jsonl.gz` compressed raw transcripts |
+| `.cursor/hooks/state/persistent-memory.json` | Per-workspace hook state (turns, last run, transcript mtime, trial window) |
 
-**Archiving**: When `incremental-index.json` has ≥500 transcript entries (configurable), the oldest 80% are moved to a timestamped archive file. Each run creates a new file (e.g. `incremental-index-2025-03-11T143052.json`). The save skill consults both the main index and archives when looking up `mtimeMs` per transcript path.
+**Git across devices**: Initialize or clone a repo at `~/.cursor/persistent-memory/`, commit summaries and index files as you prefer, and pull on other machines.
 
-**Sync across devices with git**: Initialize `~/.cursor/persistent-memory/` as a git repo and push to a remote. Pull on other machines to keep summaries in sync—works even when devices don't share the same SSH server.
+## Session list format
+
+Each line in `sessions.md` (current format):
+
+`{conversation_id[:8]} | {start} | {end} | {title} | {tags}`
+
+Legacy four-field lines (without separate start) are still supported by retrieve.
 
 ## Trigger cadence
 
-A *turn* is one completed user message plus one assistant reply (status=completed, loop_count=0).
+A **turn** is one completed user message plus one assistant reply (`status === "completed"`, `loop_count === 0`). The hook also requires the **current transcript file mtime** to have advanced since the last successful trigger.
 
-**Default cadence** (after trial expires):
-- minimum 10 completed turns
-- minimum 120 minutes since last run
-- transcript mtime must advance
+**Default** (after trial expires, if enabled):
 
-**Trial mode** (first 24h after first turn; enable via `--trial` in hook or `PERSISTENT_MEMORY_TRIAL_MODE=true`):
-- minimum 3 completed turns
-- minimum 15 minutes
-- then falls back to default cadence
+- At least **10** completed turns since last run
+- At least **120** minutes since last run
 
-## Optional env overrides
+**Trial mode** — `bun run …/persistent-memory-stop.ts --trial` **or** `PERSISTENT_MEMORY_TRIAL_MODE=true`:
 
-| Env | Purpose | Default |
-|-----|---------|--------|
-| `PERSISTENT_MEMORY_MIN_TURNS` | Min turns (default cadence) | 10 |
+- Starts on first counted turn; lasts **24 hours** by default
+- During the window: **3** turns and **15** minutes minimum
+- Then the default cadence applies
+
+## Environment overrides
+
+| Variable | Purpose | Default |
+|----------|---------|--------|
+| `PERSISTENT_MEMORY_MIN_TURNS` | Min turns (outside trial window) | 10 |
 | `PERSISTENT_MEMORY_MIN_MINUTES` | Min minutes since last run | 120 |
-| `PERSISTENT_MEMORY_TRIAL_MODE` | Enable trial when no `--trial` arg | false |
-| `PERSISTENT_MEMORY_TRIAL_MIN_TURNS` | Min turns in trial | 3 |
-| `PERSISTENT_MEMORY_TRIAL_MIN_MINUTES` | Min minutes in trial | 15 |
-| `PERSISTENT_MEMORY_TRIAL_DURATION_MINUTES` | Trial window length | 1440 (24h) |
-| `PERSISTENT_MEMORY_ARCHIVE_COUNT` | Archive when transcript entries ≥ this | 500 |
+| `PERSISTENT_MEMORY_TRIAL_MODE` | Enable trial without `--trial` | false |
+| `PERSISTENT_MEMORY_TRIAL_MIN_TURNS` | Min turns during trial | 3 |
+| `PERSISTENT_MEMORY_TRIAL_MIN_MINUTES` | Min minutes during trial | 15 |
+| `PERSISTENT_MEMORY_TRIAL_DURATION_MINUTES` | Trial length | 1440 (24h) |
+
+## Repository
+
+- **GitHub**: [xianzhu21/persistent-memory](https://github.com/xianzhu21/persistent-memory)
 
 ## License
 
