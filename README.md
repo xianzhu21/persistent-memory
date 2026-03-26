@@ -78,11 +78,11 @@ Reply with a number (1–2) to load one, or "all" for all shown.
 
 ## Session list format
 
-Each line in `sessions.md` (current format):
+`sessions.md` is a **GitHub Flavored Markdown table** (markdown sheet): optional `# Persistent memory sessions` heading, then `| ID | Start | End | Title | Tags |`, a `| --- | …` separator row, and one data row per conversation (newest rows first). Each data row is:
 
-`{conversation_id[:8]} | {start} | {end} | {title} | {tags}`
+`| {conversation_id[:8]} | {start} | {end} | {title} | {tags} |`
 
-Legacy four-field lines (without separate start) are still supported by retrieve.
+Escape literal `|` in a cell as `\|`. **persistent-memory-retrieve** also accepts legacy plain lines (same five fields without table markup, or four-field lines without separate start).
 
 ## Trigger cadence
 

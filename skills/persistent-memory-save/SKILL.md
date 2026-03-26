@@ -45,7 +45,7 @@ No `conversation_id` or `transcript_path` from outside—discover everything fro
    - If the content has **no substantive content** (e.g. only a single command, no decisions/findings/edits): do **not** write or update the summary file; do **not** add/update this conversation in sessions.md; do **not** archive the transcript.
 - **Low-value command-only runs are non-substantive by default:** if the conversation is primarily executing `/persistent-memory-save` or `/persistent-memory-retrieve` and does **not** modify persistent-memory implementation or skills, treat it as no substantive content. In this case, do **not** write/update summary, do **not** update sessions.md, and do **not** archive transcript.
 - **Exception (recordable):** if the same conversation includes meaningful changes to persistent-memory behavior (for example `skills/persistent-memory-save/SKILL.md`, `skills/persistent-memory-retrieve/SKILL.md`, `hooks/persistent-memory-stop.ts`, plugin config, or related code/docs with decisions/findings), then it is substantive and should be summarized normally.
-   - **Always** for this transcript (even when no substantive content): update `incremental-index.json` for the transcript’s **absolute path** with `mtimeMs` = current file mtime (ms since epoch), `lastProcessedAt` = current ISO timestamp. Only when a summary was **written** for this conversation: upsert `sessions.md` (line `{conversation_id[:8]} | {start} | {end} | {title} | {tags}`; end = current time when saving).
+   - **Always** for this transcript (even when no substantive content): update `incremental-index.json` for the transcript’s **absolute path** with `mtimeMs` = current file mtime (ms since epoch), `lastProcessedAt` = current ISO timestamp. Only when a summary was **written** for this conversation: upsert `sessions.md` (one **markdown table row**; **`{end}` from transcript mtime—see Session List Update**).
 
 5. **Write back**  
    Save `incremental-index.json` and `sessions.md` after processing. **CRITICAL:** If any transcripts were processed (including those with no substantive content), you MUST update and persist the index so the next run skips them until their file mtime changes. If no transcripts needed updates or all had no substantive content, respond exactly: `No session summary generated (no substantive content); index updated.`
@@ -103,7 +103,7 @@ Branch, remote. Omit if not relevant.
 ```
 
 - Use `##` for sections; omit sections with no content. At minimum keep `# title`, `## Summary`, `## Transcript` (with archive path), `## Tags`. **NEVER omit** `## Transcript` — it points to the `.jsonl.gz` for retrieval. **NEVER omit `## Transcript`** — it must contain the archive path. **NEVER omit `## Transcript`** — it must contain the archive path so `persistent-memory-retrieve` can load the raw transcript.
-- **Summary H1 — `{start}` and `{end}`:** Use the **same semantics and values** as the **Start** and **End** fields in `sessions.md` (see Session List Update). Format both as `YYYY-MM-DDTHHMM`. **`{start}`:** transcript `.jsonl` file birth time (e.g. `stat -c %W` on Linux, `stat -f %B` on macOS); if unavailable, use `{end}`. **`{end}`:** current time when writing/updating this summary. On incremental merges, keep `{start}` from the original transcript birth time; refresh `{end}` to the current save time.
+- **Summary H1 — `{start}` and `{end}`:** Use the **same semantics and values** as the **Start** and **End** fields in `sessions.md` (see Session List Update). Format both as `YYYY-MM-DDTHHMM` (local wall time derived from the chosen epoch fields). **`{start}`:** transcript `.jsonl` file birth time (e.g. `stat -c %W` on Linux, `stat -f %B` on macOS); if birth is unknown or `0`, use the transcript file **mtime** for both `{start}` and `{end}`. **`{end}`:** transcript `.jsonl` file **mtime** (last modification of the conversation artifact), e.g. `stat -c %Y` then convert to `YYYY-MM-DDTHHMM`—**not** the wall-clock time when running save, and **not** “summary last rewritten.” On incremental merges, recompute `{end}` from the current transcript mtime whenever you write the summary; keep `{start}` from birth unless birth was never available (then keep using mtime for start as above).
 - **Descriptive title:** The third segment after `{start} | {end} |` (typically 2–4 clauses, ~40–80 chars total) so similar sessions are distinguishable. Include: main topic, key outcome or artifact, and a distinguishing detail (e.g. module/file name, Gerrit topic). Avoid terse one-liners; prefer specifics (e.g. "SurfaceFlinger parallel_refresh RE log analysis, drawSummary fix" vs "SF log analysis").
 - **Do not record save/retrieve as session themes:** Do **not** include `persistent-memory-save` or `persistent-memory-retrieve` in the title or Summary when they merely describe the user running those commands—they are meta-actions, not session themes. Focus on the actual work (e.g. "Daily summary yesterday (Mar 18), Logs 260318" not "...persistent-memory-save"). **Exception:** Only mention them when the session is *about* the skill/plugin (e.g. modifying SKILL.md, debugging save behavior, adding command-noise guard).
 - In `## Transcript`, replace `{conversation_id}` with the actual conversation id for this session.
@@ -149,13 +149,24 @@ File: `~/.cursor/persistent-memory/sessions.md`
 
 sessions.md lists **conversations that have summary content** (i.e. a written `{conversation_id}.md`). Update it only when you write or update a summary for a conversation; do not add/update a line when the run produced no substantive content for that conversation.
 
-Each line: `{conversation_id[:8]} | {start} | {end} | {title} | {tags}`
+**Format — markdown sheet (GFM table):** The file is a single table, not pipe-separated plain lines.
 
-- **Start:** Transcript file birth time (e.g. `stat -c %W` on Linux, `stat -f %B` on macOS; format `YYYY-MM-DDTHHMM`). If unavailable, use end. Must match the **first** segment of the summary file H1 (`# {start} | {end} | …`).
-- **End:** Current time when saving, format `YYYY-MM-DDTHHMM`. Must match the **second** segment of the summary H1. On each summary update, set **End** to the new save time and refresh `{end}` in the H1 accordingly.
+1. Optional heading: `# Persistent memory sessions` (keep if present).
+2. Blank line, then header row: `| ID | Start | End | Title | Tags |`
+3. Separator row: `| --- | --- | --- | --- | --- |`
+4. One data row per session (newest sessions **first**, immediately below the separator).
+
+**Each data row** (five cells):
+
+`| {conversation_id[:8]} | {start} | {end} | {title} | {tags} |`
+
+- **Start:** Transcript file birth time (e.g. `stat -c %W` on Linux, `stat -f %B` on macOS; format `YYYY-MM-DDTHHMM`). If unavailable or `0`, use transcript **mtime** (same as End). Must match the **first** segment of the summary file H1 (`# {start} | {end} | …`).
+- **End:** Transcript `.jsonl` **mtime** (last modification of the transcript file), format `YYYY-MM-DDTHHMM`—represents when the conversation artifact last changed, **not** when the summary was saved. Must match the **second** segment of the summary H1. On each summary write, set **End** from the transcript’s current mtime (and refresh `{end}` in the H1 accordingly).
 - **Title:** The **descriptive title only**—the **third** segment of the summary H1 (not the full `#` line). Must be descriptive enough to distinguish from similar sessions (see Output Format).
 - **Tags:** Same as the summary `## Tags`; at most 3 most relevant (see Output Format).
-- Upsert: replace line starting with `{conversation_id[:8]}` or prepend if missing (newest at top).
+- **Cell escaping:** If `{title}` or `{tags}` contains a literal `|` (pipe), write it as `\|` inside the cell so the table stays valid.
+- **Upsert:** Replace the **data row** whose **ID** cell equals `{conversation_id[:8]}`; if none exists, **insert** a new row **immediately after** the separator row (top of table = newest). Preserve the heading, header, and separator rows; do not duplicate the table.
+- **Legacy:** If you encounter an old plain-line file (`id | start | end | title | tags` without leading `|`), rewrite the whole file to this table format on the next save.
 
 ## Transcript Parsing
 
