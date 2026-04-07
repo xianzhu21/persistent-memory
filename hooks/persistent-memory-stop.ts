@@ -14,7 +14,7 @@ const TRIAL_DEFAULT_DURATION_MINUTES = 24 * 60;
 // Legacy index helpers (ConvEntry/IncrementalIndex) have been removed.
 
 const FOLLOWUP_MESSAGE =
-  `Run the \`persistent-memory-save\` skill now. Process the current project's transcripts under \`~/.cursor/projects/<workspace-slug>/agent-transcripts/\`: use incremental index \`~/.cursor/persistent-memory/incremental-index.json\` (transcripts key, mtimeMs + lastProcessedAt) and only process transcripts not in the index or whose file mtime is newer than indexed mtimeMs. For each, merge and write \`~/.cursor/persistent-memory/summaries/{conversation_id}.md\` and update \`sessions.md\` and the index. If no transcripts need updates or there is no substantive content, respond exactly: No session summary generated (no substantive content); index updated.`;
+  `Run the \`persistent-memory-save\` skill now. Use the \`persistent-memory-saver\` subagent for the full session summary flow. Process the current project's transcripts under \`~/.cursor/projects/<workspace-slug>/agent-transcripts/\`: use incremental index \`~/.cursor/persistent-memory/incremental-index.json\` (transcripts key, mtimeMs + lastProcessedAt) and only process transcripts not in the index or whose file mtime is newer than indexed mtimeMs. For each, merge and write \`~/.cursor/persistent-memory/summaries/{conversation_id}.md\`, archive to \`~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz\`, and update \`sessions.md\` and the index. If no transcripts need updates or there is no substantive content, respond exactly: No session summary generated (no substantive content); index updated.`;
 
 interface StopHookInput {
   conversation_id: string;
