@@ -41,7 +41,7 @@ curl -fsSL https://bun.sh/install | bash
 ## How it works
 
 - **Stop hook** — On eligible session stops, prints a `followup_message` that tells the agent to run the `persistent-memory-save` skill. Skips if the same `generation_id` was already handled (avoids duplicate follow-ups).
-- **persistent-memory-save** — Incrementally processes **this workspace’s** transcripts under `~/.cursor/projects/<workspace-slug>/agent-transcripts/`, keyed by file mtime in `~/.cursor/persistent-memory/incremental-index.json`. Merges into `summaries/{conversation_id}.md`, gzips the raw JSONL to `transcripts/{conversation_id}.jsonl.gz`, updates `sessions.md`. Invoked by the hook or manually with `/persistent-memory-save`. Skips empty or non-substantive transcripts (see skill).
+- **persistent-memory-save** — Orchestration-only skill (`disable-model-invocation: true`): delegates to the **`persistent-memory-session-updater`** subagent. The updater incrementally processes **this workspace’s** transcripts under `~/.cursor/projects/<workspace-slug>/agent-transcripts/`, keyed by file mtime in `~/.cursor/persistent-memory/incremental-index.json`. Merges into `summaries/{conversation_id}.md`, gzips the raw JSONL to `transcripts/{conversation_id}.jsonl.gz`, updates `sessions.md`. Invoked by the hook or manually with `/persistent-memory-save`. Skips empty or non-substantive transcripts (see `agents/persistent-memory-session-updater.md`).
 - **persistent-memory-retrieve** — `/persistent-memory-retrieve` with optional **natural-language** filter (not only tags). Results are sorted by summary file mtime (newest first). Optional trailing number sets how many rows to show (default 15).
 
 ## Retrieve example
