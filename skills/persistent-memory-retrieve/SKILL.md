@@ -1,6 +1,6 @@
 ---
 name: persistent-memory-retrieve
-description: When user types /persistent-memory-retrieve [query], read ~/.cursor/persistent-memory/sessions.md, filter by semantic match (title/tags/summary), preserve sessions.md line order, show session list, let user select, then load full summary into context.
+description: When user types /persistent-memory-retrieve [query], read ~/.cursor/persistent-memory/sessions.md, filter by semantic match (title/tags/summary), preserve sessions.md line order (maintained as End-descending by persistent-memory-save), show session list, let user select, then load full summary into context.
 ---
 
 # Persistent Memory Retrieve
@@ -10,11 +10,11 @@ Browse and load past session summaries into the current context. Use when the us
 ## Workflow
 
 1. **Read session list** from `~/.cursor/persistent-memory/sessions.md`
-2. **Parse lines** – build the session list from `sessions.md` in file order (top to bottom):
+2. **Parse lines** – build the session list from `sessions.md` in file order (top to bottom). After a successful `persistent-memory-save`, data rows are **sorted by `End` descending**; scanning top to bottom is therefore newest-`End` first (legacy or hand-edited files may be unsorted—in that case you may sort by `End` descending when displaying for consistency).
    - **Markdown table (current):** Ignore the `#` heading, blank lines, the header row `| ID | Start | …`, and the separator row `| --- | …`. For each following line that starts with `|`, parse **five cells** (split on `|`, trim; treat `\|` inside a cell as a literal pipe). Skip malformed rows.
    - **Legacy plain lines:** `{id_prefix} | {start} | {end} | {title} | {tags}` (5 fields) or `{id_prefix} | {end} | {title} | {tags}` (4 fields). If 4 fields, treat the single timestamp as end only. Use for files not yet converted to a table.
 3. **Parse limit** – if the query ends with a number (e.g. `30` or `50`), use it as N; otherwise N = 15. E.g. `persistent-memory-retrieve SF 30` → query = "SF", N = 30; `persistent-memory-retrieve 30` → query = "", N = 30.
-4. **Filter** – treat the remainder as a natural-language query (sentence or phrase). **Semantic filtering:** interpret the user's intent and include only sessions whose `{title}`, `{tags}`, or summary content is semantically relevant. E.g. "SF crash we investigated before" → SurfaceFlinger crash/investigation sessions; "Cursor pricing" → Cursor pricing; "gerrit commits" → Gerrit commit/CL sessions. Use meaning, not just keyword substring match. If no query, show all. **Order:** scan `sessions.md` from top to bottom; keep each matching line in that order (do **not** re-sort by summary file mtime or by `{end}` timestamp).
+4. **Filter** – treat the remainder as a natural-language query (sentence or phrase). **Semantic filtering:** interpret the user's intent and include only sessions whose `{title}`, `{tags}`, or summary content is semantically relevant. E.g. "SF crash we investigated before" → SurfaceFlinger crash/investigation sessions; "Cursor pricing" → Cursor pricing; "gerrit commits" → Gerrit commit/CL sessions. Use meaning, not just keyword substring match. If no query, show all. **Order:** keep matches in **`sessions.md` file order** (normally `End` descending after save). Do **not** re-sort by summary file mtime. If the file looks out of order, sort matches by `End` descending for display.
 5. **Display** – show top N entries (default 15) as a **Markdown table** so it renders in chat. Include header and separator:
    ```
    | # | ID | Time | Title | Tags |

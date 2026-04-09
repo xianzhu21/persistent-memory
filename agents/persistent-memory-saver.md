@@ -161,7 +161,7 @@ sessions.md lists **conversations that have summary content** (i.e. a written `{
 1. Optional heading: `# Persistent memory sessions` (keep if present).
 2. Blank line, then header row: `| ID | Start | End | Title | Tags |`
 3. Separator row: `| --- | --- | --- | --- | --- |`
-4. One data row per session (newest sessions **first**, immediately below the separator).
+4. One data row per session (below the separator). **Table order:** After any insert or replace, **sort all data rows by the `End` column descending** (newest transcript mtime first). Parse `End` as `YYYY-MM-DDTHHMM` (zero-padded fields; lexicographic order matches chronological). **Tie-breakers:** if two rows share the same `End`, sort by `Start` descending; if still tied, sort by `ID` ascending for a stable order.
 
 **Each data row** (five cells):
 
@@ -172,7 +172,7 @@ sessions.md lists **conversations that have summary content** (i.e. a written `{
 - **Title:** The **descriptive title only**—the **third** segment of the summary H1 (not the full `#` line). Must be descriptive enough to distinguish from similar sessions (see Output Format).
 - **Tags:** Same as the summary `## Tags`; at most 3 most relevant (see Output Format).
 - **Cell escaping:** If `{title}` or `{tags}` contains a literal `|` (pipe), write it as `\|` inside the cell so the table stays valid.
-- **Upsert:** Replace the **data row** whose **ID** cell equals `{conversation_id[:8]}`; if none exists, **insert** a new row **immediately after** the separator row (top of table = newest). Preserve the heading, header, and separator rows; do not duplicate the table.
+- **Upsert:** Load all existing data rows. Replace the row whose **ID** cell equals `{conversation_id[:8]}` with the new cells, or **append** one row if no match. Then **rewrite the full table**: heading, header, separator, then **all data rows sorted by `End` descending** (then `Start` descending, then `ID` ascending per tie-breakers above). Do not duplicate the table or leave rows out of order.
 - **Legacy:** If you encounter an old plain-line file (`id | start | end | title | tags` without leading `|`), rewrite the whole file to this table format on the next save.
 
 ## Transcript Parsing
