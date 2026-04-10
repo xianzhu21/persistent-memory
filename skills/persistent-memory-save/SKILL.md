@@ -22,3 +22,7 @@ Use when the Stop hook follow-up fires, the user runs `/persistent-memory-save`,
 - Keep the parent skill orchestration-only.
 - Do not mine transcripts or edit files in the parent flow.
 - Do not bypass the subagent.
+
+## VS Code workspace projects (`.code-workspace`)
+
+The subagent must follow `agents/persistent-memory-saver.md` step 1: scan **all** matching `agent-transcripts` dirs for the same repo token. Example: `.../mnt-2tb-monalisadesign-gloable/agent-transcripts` (window opened on the folder) **and** `.../mnt-2tb-monalisadesign-gloable-monalisadesign-code-workspace/agent-transcripts` (window opened via `monalisadesign.code-workspace`). Chats from the workspace window live under the `*code-workspace` slug—scanning only the folder slug misses them. This is about **VS Code/Cursor project identity**, not whether the `.code-workspace` file is multi-root.

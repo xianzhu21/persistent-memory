@@ -18,24 +18,30 @@ Incrementally update structured session summaries from the **current project's**
 
 ## Inputs
 
-- **Transcript root:** `~/.cursor/projects/<workspace-slug>/agent-transcripts/` (resolve from current workspace).
+- **Transcript root(s):** One or more dirs `.../agent-transcripts/` under `~/.cursor/projects/` (see workflow step 1). **Not** always a single slug: opening via a **VS Code workspace** file (`.code-workspace`) usually creates a separate Cursor project folder like `.../<slug>-<workspace-stem>-code-workspace/agent-transcripts/`, while **Open Folder** on the repo uses `.../<slug>/agent-transcripts/` (same disk tree, different project slug).
 - **Incremental index:** `~/.cursor/persistent-memory/incremental-index.json`
 - **Summary dir:** `~/.cursor/persistent-memory/summaries/`
 - **Transcript archive dir:** `~/.cursor/persistent-memory/transcripts/`
 - **Session list:** `~/.cursor/persistent-memory/sessions.md`
 
-No `conversation_id` or `transcript_path` from outside—discover everything from the project's transcript root.
+No `conversation_id` or `transcript_path` from outside—discover everything from the project's transcript root(s).
 
 ## Workflow
 
-1. **Resolve transcript root**  
-   Current project's agent-transcripts path: `~/.cursor/projects/<workspace-slug>/agent-transcripts/`. Infer workspace-slug from workspace path (e.g. directory name or slug form). List `~/.cursor/projects/` if needed to find the folder matching the current workspace.
+1. **Resolve transcript root(s)**  
+   Infer a **workspace token** from the current context (e.g. repo folder basename such as `monalisadesign-gloable`). Under `~/.cursor/projects/`, collect **every** existing directory named `agent-transcripts` whose parent folder name **contains** that token (case-sensitive substring match).  
+   **Always check both** when applicable: `~/.cursor/projects/<slug>/agent-transcripts` **and** `~/.cursor/projects/<slug>-<workspace-stem>-code-workspace/agent-transcripts` (any `...-*-code-workspace/agent-transcripts` sharing the same token)—Cursor writes parent chats under the slug for **how the window was opened** (folder vs `.code-workspace`), not whether the `.code-workspace` lists one or many roots.  
+   **Do not** only scan the folder-opened slug if a `*code-workspace/agent-transcripts` sibling exists for the same repo token.  
+   Union all discovered roots; when listing transcripts, walk **each** root and use the **absolute path** to each `{id}/{id}.jsonl` (dedupe by path).
 
 2. **Load incremental index**  
    Read `~/.cursor/persistent-memory/incremental-index.json`. List `~/.cursor/persistent-memory/incremental-index-*.json` archives if needed; use latest `lastProcessedAt` per transcript path when merging.
 
 3. **Discover transcripts to process**  
-   List subdirs of the transcript root; each subdir name is a `conversation_id`, and the transcript file is `{transcript_root}/{conversation_id}/{conversation_id}.jsonl`. Resolve each file to its **absolute path**. Process only:
+   Collect transcript paths under the transcript root (dedupe by absolute path):
+   - **Nested layout (common):** each subdir named `conversation_id` with file `{transcript_root}/{conversation_id}/{conversation_id}.jsonl`.
+   - **Flat layout:** some Cursor/project folders store `{transcript_root}/{conversation_id}.jsonl` directly (no subdir). Include every such `*.jsonl` at the root of `agent-transcripts/` whose basename (without `.jsonl`) looks like a conversation id (e.g. UUID). Do **not** skip these; they are the same artifact type as nested files.
+   Resolve each file to its **absolute path**. Process only:
    - transcripts **not** in the index (process full file), or
    - transcripts whose file **mtime** is newer than `index.transcripts[abs_path].mtimeMs` (process full file).
 
