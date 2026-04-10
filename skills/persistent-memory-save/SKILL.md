@@ -14,7 +14,7 @@ Use when the Stop hook follow-up fires, the user runs `/persistent-memory-save`,
 
 ## Workflow
 
-1. Call `persistent-memory-saver` (it merges summaries, archives transcripts, updates the incremental index, and rewrites `sessions.md` with **all data rows sorted by `End` descending**—newest transcript `End` first per `agents/persistent-memory-saver.md`).
+1. Call `persistent-memory-saver` (it merges summaries, archives transcripts, updates the incremental index, and rewrites `sessions.md` with **all data rows sorted by `End` descending**—newest transcript `End` first per `agents/persistent-memory-saver.md`. Tags in `sessions.md` and in each summary’s `## Tags` include **`#project-<slug>`** first, from the transcript path.)
 2. Return the saver result.
 
 ## Guardrails

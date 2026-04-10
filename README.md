@@ -42,7 +42,7 @@ curl -fsSL https://bun.sh/install | bash
 
 - **Stop hook** — On eligible session stops, prints a `followup_message` that tells the agent to run the `persistent-memory-save` skill. Skips if the same `generation_id` was already handled (avoids duplicate follow-ups).
 - **persistent-memory-save** — Orchestrates the save flow: delegates transcript mining and file writes to the **`persistent-memory-saver`** subagent (same pattern as [continual-learning](https://github.com/cursor/plugins/tree/main/continual-learning)’s skill + `agents-memory-updater`). Processes **this workspace’s** transcripts under `~/.cursor/projects/<workspace-slug>/agent-transcripts/` (nested `…/id/id.jsonl` or top-level `…/id.jsonl`; see `agents/persistent-memory-saver.md`), keyed by absolute path and file mtime in `~/.cursor/persistent-memory/incremental-index.json`. Merges into `summaries/{conversation_id}.md`, gzips the raw JSONL to `transcripts/{conversation_id}.jsonl.gz`, updates `sessions.md`. Invoked by the hook or manually with `/persistent-memory-save`. Skips empty or non-substantive transcripts (see `agents/persistent-memory-saver.md`).
-- **persistent-memory-retrieve** — `/persistent-memory-retrieve` with optional **natural-language** filter (not only tags). Results are sorted by summary file mtime (newest first). Optional trailing number sets how many rows to show (default 15).
+- **persistent-memory-retrieve** — `/persistent-memory-retrieve` with optional **natural-language** filter. **Default** (no query): rows whose tags include **`#project-<slug>`** for the current workspace, using the **same** dirname + **k-probe** rules as save (`skills/persistent-memory-retrieve/SKILL.md`). Say **`all`** / **`all projects`** to list across projects. Optional trailing number sets row limit (default 15). Order follows **`sessions.md`** (`End` descending after save).
 
 ## Retrieve example
 
@@ -51,8 +51,8 @@ curl -fsSL https://bun.sh/install | bash
 
 | # | ID | Time | Title | Tags |
 | --- | --- | --- | --- | --- |
-| 1 | a3f1b2c4 | 2026-03-10T2215–2345 | SF parallel_refresh RE log, drawSummary | #surfaceflinger #parallel-refresh |
-| 2 | 7d8e9f0a | 2026-03-09T1820 | Layer parent crash investigation | #surfaceflinger |
+| 1 | a3f1b2c4 | 2026-03-10T2215–2345 | SF parallel_refresh RE log, drawSummary | #project-mnt-2tb-android #surfaceflinger #parallel-refresh |
+| 2 | 7d8e9f0a | 2026-03-09T1820 | Layer parent crash investigation | #project-mnt-2tb-android #surfaceflinger |
 
 Reply with a number (1–2) to load one, or "all" for all shown.
 
@@ -81,6 +81,8 @@ Reply with a number (1–2) to load one, or "all" for all shown.
 `sessions.md` is a **GitHub Flavored Markdown table** (markdown sheet): optional `# Persistent memory sessions` heading, then `| ID | Start | End | Title | Tags |`, a `| --- | …` separator row, and one data row per conversation (newest rows first). Each data row is:
 
 `| {conversation_id[:8]} | {start} | {end} | {title} | {tags} |`
+
+The **Tags** cell starts with a **`#project-<slug>`** tag: same **canonical** dirname for **Open Folder** and **Open `.code-workspace`** — after stripping `-code-workspace`, walk **`k` = 1,2,…** trailing segments as workspace stem until **`~/.cursor/projects/{base}/agent-transcripts`** exists, else fall back to one segment; then normalize — see `agents/persistent-memory-saver.md`. Up to three topic tags follow. That lets `/persistent-memory-retrieve` match **this repo** in either window mode.
 
 Escape literal `|` in a cell as `\|`. **persistent-memory-retrieve** also accepts legacy plain lines (same five fields without table markup, or four-field lines without separate start).
 
