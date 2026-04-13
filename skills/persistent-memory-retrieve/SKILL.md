@@ -1,6 +1,6 @@
 ---
 name: persistent-memory-retrieve
-description: "Use when the user runs /persistent-memory-retrieve or asks to browse, search, or load persisted session summaries from ~/.cursor/persistent-memory (sessions list, pick by number, inject full summary). Default scope is current workspace; optional natural-language filter; say all or all projects for every workspace."
+description: "Use when the user runs /persistent-memory-retrieve or asks to browse, search, or load persisted session summaries from ~/.cursor/persistent-memory (sessions list, pick by number, inject full summary). Default scope is current workspace; optional natural-language filter; default list size 10 rows; say all or all projects for every workspace."
 ---
 
 # Persistent Memory Retrieve
@@ -13,7 +13,7 @@ Browse and load past session summaries into the current context. Use when the us
 2. **Parse lines** – build the session list from `sessions.md` in file order (top to bottom). After a successful `persistent-memory-save`, data rows are **sorted by `End` descending**; scanning top to bottom is therefore newest-`End` first (legacy or hand-edited files may be unsorted; in that case you may sort by `End` descending when displaying for consistency).
    - **Markdown table (current):** Ignore the `#` heading, blank lines, the header row `| ID | Start | …`, and the separator row `| --- | …`. For each following line that starts with `|`, parse **five cells** (split on `|`, trim; treat `\|` inside a cell as a literal pipe). Skip malformed rows.
    - **Legacy plain lines:** `{id_prefix} | {start} | {end} | {title} | {tags}` (5 fields) or `{id_prefix} | {end} | {title} | {tags}` (4 fields). If 4 fields, treat the single timestamp as end only. Use for files not yet converted to a table.
-3. **Parse limit** – if the query ends with a number (e.g. `30` or `50`), use it as N; otherwise N = 15. E.g. `persistent-memory-retrieve SF 30` → query = "SF", N = 30; `persistent-memory-retrieve 30` → query = "", N = 30.
+3. **Parse limit** – if the command text ends with a **trailing** positive integer (e.g. `30` or `50`), use it as **N**; otherwise **N = 10** (default row cap). E.g. `persistent-memory-retrieve SF 30` → query = "SF", N = 30; `persistent-memory-retrieve 30` → query = "", N = 30; bare `/persistent-memory-retrieve` → N = 10.
 4. **Resolve current `#project-<slug>`** (same rules as `agents/persistent-memory-saver.md`; suitable and **required** for retrieve, not a different heuristic):
    - From the **current workspace**, determine the Cursor **projects** folder name that would hold this window’s transcripts: the segment **above** `agent-transcripts` in `~/.cursor/projects/<workspace-folder>/agent-transcripts/` (infer from open folder / workspace the same way the saver resolves transcript roots; use the folder that applies to **this** chat).
    - Apply **identical** canonicalization to that `<workspace-folder>`: if it ends with `-code-workspace`, form **`inner`**, split on `-`, handle **`len(segments) < 2`**, then for **`k` = 1,2,…** probe **`~/.cursor/projects/{base}/agent-transcripts`** until a directory exists, else **`k` = 1** fallback; then **normalize** to `[a-z0-9-]` (lowercase, collapse hyphens, etc.) → build token **`#project-<slug>`**.
@@ -23,7 +23,7 @@ Browse and load past session summaries into the current context. Use when the us
    - **Non-empty query:** **Semantic filtering**: include sessions whose `{title}`, `{tags}`, or summary content is semantically relevant (e.g. "SF crash we investigated before" → SurfaceFlinger crash sessions). Use meaning, not only keywords. Unless the user’s wording clearly asks for **this project** / **here** / **current repo**, do **not** require `current_project_tag`; if they do ask, **intersect** semantic matches with **`{tags}`** containing **`current_project_tag`** when it is set. If the query clearly spans **other** projects or past work elsewhere, do not force the project filter.
    - **Legacy rows** without `#project-…` in `{tags}`: when project filtering is active (empty query with known tag), **exclude** them from the list, or include only if the user asked **all projects**; prefer **exclude** so the list matches the current workspace.
    **Order:** keep matches in **`sessions.md` file order** (normally `End` descending after save). Do **not** re-sort by summary file mtime. If the file looks out of order, sort matches by `End` descending for display.
-6. **Display** – show top N entries (default 15) as a **block list**, not a five-column markdown table. Chat UIs give each table column a share of width, which squeezes **Title** (and **Tags**) when **ID** and **Time** sit on the same row, especially after filtering leaves fewer rows.
+6. **Display** – show top **N** entries (default **10**) as a **block list**, not a five-column markdown table. Chat UIs give each table column a share of width, which squeezes **Title** (and **Tags**) when **ID** and **Time** sit on the same row, especially after filtering leaves fewer rows.
    - **Scannability (MUST):** Each session must be **easy to pick out** when skimming: use a **horizontal rule** `---` **between** sessions (and one before the first entry is recommended so the list has a clear top edge). Start each session with a **numbered list marker** **`{n}.`** (e.g. `1.`, `2.`) so the numeral matches what the user replies with. On the **same line**: the marker, then **` `{id_prefix}` · `** (backticks around id only), then the **human-readable time** (see below; do **not** paste raw `YYYY-MM-DDTHHMM` tokens in the list).
    - **Readable time (MUST):** `sessions.md` uses wall times as `YYYY-MM-DDTHHMM` (letter `T`, then **four** digits `HHMM`, no colon). For **display only**, parse and reformat:
      1. **One stamp** `YYYY-MM-DDTHHMM` → **`YYYY-MM-DD HH:MM`** (insert `:` between hour and minute; replace `T` with a space).
@@ -56,7 +56,8 @@ Browse and load past session summaries into the current context. Use when the us
 7. **User reply** – interpret as follows:
    - **Number 1..N** → load that session (go to Load step)
    - **"all"** → load all shown sessions
-   - **Number > N** (e.g. "30" when N=15) **or "more"** → show more: re-display with that limit (or N+15 for "more"). Then prompt again.
+   - **Number > N** (e.g. "30" when N=10) **or "more"** → show more: re-display with that limit, or for **"more"** alone use **N' = N + 10** (same filter). Then prompt again.
+   - **Limit-only follow-up (MUST):** If the user sends **only** a new row cap (e.g. **`set limit to 10`**, **`limit 10`**, **`show 10`**, **`10`**, **`N=20`**) **and** this chat already has an **immediately preceding** persistent-memory retrieve list (same turn sequence: you showed a filtered list and they did not start unrelated work), **reuse the same filter**: same **global vs project** intent, same **natural-language query** (or same empty-query project scope), **only change N**. Re-read `sessions.md`, re-apply steps 5–6, and re-prompt. If there is **no** prior retrieve context in the chat, treat the message as ambiguous: ask whether they meant **`/persistent-memory-retrieve … <N>`** or repeat the intended query.
    - Alternatively, the user may add a limit in the command: `/persistent-memory-retrieve [query] 30`
 8. **Load** – for each selected item, read `~/.cursor/persistent-memory/summaries/{conversation_id}.md` (use id_prefix to match; if multiple match, take most recent). If id_prefix is 8 chars, match files whose name starts with that prefix
 9. **Inject** – **MUST** output the full summary content verbatim in chat first; **then** append the instruction line. Do **not** skip to the instruction without displaying the summary.
@@ -83,7 +84,7 @@ If a `summaries/{id}.md` file is only a **tooling placeholder** (e.g. "Batch sav
 
 ## Examples
 
-- `/persistent-memory-retrieve` → resolve **`current_project_tag`** with the same **k-probe** rules as save; show top 15 rows whose `{tags}` contain that tag (this workspace only). If tag unknown, show top 15 of **all** rows. Use **`all`** / **`all projects`** in the query to list across projects.
+- `/persistent-memory-retrieve` → resolve **`current_project_tag`** with the same **k-probe** rules as save; show top **10** rows whose `{tags}` contain that tag (this workspace only). If tag unknown, show top **10** of **all** rows. Use **`all`** / **`all projects`** in the query to list across projects.
 - `/persistent-memory-retrieve SF crash we investigated before` → sessions about SurfaceFlinger crash investigation (semantic match)
 - `/persistent-memory-retrieve Cursor pricing and plans` → sessions about Cursor pricing/plans
 - `/persistent-memory-retrieve gerrit code review and commits` → sessions about Gerrit reviews and commits
