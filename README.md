@@ -49,12 +49,23 @@ curl -fsSL https://bun.sh/install | bash
 ```
 > /persistent-memory-retrieve surfaceflinger
 
-| # | ID | Time | Title | Tags |
-| --- | --- | --- | --- | --- |
-| 1 | a3f1b2c4 | 2026-03-10T2215–2345 | SF parallel_refresh RE log, drawSummary | #project-mnt-2tb-android #surfaceflinger #parallel-refresh |
-| 2 | 7d8e9f0a | 2026-03-09T1820 | Layer parent crash investigation | #project-mnt-2tb-android #surfaceflinger |
+---
 
-Reply with a number (1–2) to load one, or "all" for all shown.
+1. `a3f1b2c4` · 2026-03-10 22:15 - 23:45
+
+**Title:** SF parallel_refresh RE log, drawSummary
+
+**Tags:** #project-mnt-2tb-android #surfaceflinger #parallel-refresh
+
+---
+
+2. `7d8e9f0a` · 2026-03-09 18:20
+
+**Title:** Layer parent crash investigation
+
+**Tags:** #project-mnt-2tb-android #surfaceflinger
+
+Reply with a number (1-2) to load one, or "all" for all shown.
 
 > 1
 [Full summary .md content appears in chat, then a short “loaded” line]
