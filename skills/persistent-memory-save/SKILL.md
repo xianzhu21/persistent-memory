@@ -15,6 +15,7 @@ Use when the Stop hook follow-up fires, the user runs `/persistent-memory-save`,
 ## Workflow
 
 1. **Use the Task tool once (MUST).** Set `subagent_type` to `persistent-memory-saver`. In `prompt`, tell the saver to follow `agents/persistent-memory-saver.md` for **this** Cursor workspace: discover every matching `~/.cursor/projects/*/agent-transcripts/` root (folder vs `*code-workspace` slugs), use `~/.cursor/persistent-memory/incremental-index.json` for mtime-based incremental processing, merge into `summaries/{conversation_id}.md`, gzip raw JSONL to `transcripts/{conversation_id}.jsonl.gz`, rewrite `sessions.md` with **all data rows sorted by `End` descending** (newest first), update the index. Tags in `sessions.md` and each summary’s `## Tags` must lead with **`#project-<slug>`** from the transcript path. **Do not** mine transcripts or write those files in this chat—the subagent owns all disk writes.
+   To reduce runtime and churn, instruct the subagent to **avoid generating temporary helper scripts** (e.g. ad-hoc Python files) and to perform the required work via direct file operations and minimal shell commands only.
 2. Return the subagent result (verbatim summary of outcome is fine).
 
 ## Guardrails
