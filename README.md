@@ -40,8 +40,9 @@ curl -fsSL https://bun.sh/install | bash
 
 ## How it works
 
-- **Stop hook** — On eligible session stops, prints a `followup_message` that tells the agent to run the `persistent-memory-save` skill. Skips if the same `generation_id` was already handled (avoids duplicate follow-ups).
-- **persistent-memory-save** — Orchestrates the save flow: delegates transcript mining and file writes to the **`persistent-memory-saver`** subagent (same pattern as [continual-learning](https://github.com/cursor/plugins/tree/main/continual-learning)’s skill + `agents-memory-updater`). Processes **this workspace’s** transcripts under `~/.cursor/projects/<workspace-slug>/agent-transcripts/` (nested `…/id/id.jsonl` or top-level `…/id.jsonl`; see `agents/persistent-memory-saver.md`), keyed by absolute path and file mtime in `~/.cursor/persistent-memory/incremental-index.json`. Merges into `summaries/{conversation_id}.md`, gzips the raw JSONL to `transcripts/{conversation_id}.jsonl.gz`, updates `sessions.md`. Invoked by the hook or manually with `/persistent-memory-save`. Skips empty or non-substantive transcripts (see `agents/persistent-memory-saver.md`).
+- **Stop hook** — On eligible stops, emits `followup_message` (`PERSISTENT_MEMORY_TRIGGER=stop-hook`, optional `transcript_path=` / `conversation_id=`). **`generation_id` handling** matches **`continual-learning-stop.ts`**: if `generation_id` is present and equals `lastProcessedGenerationId` for this conversation, exit immediately with no state write (duplicate Stop); otherwise set `lastProcessedGenerationId` to `generation_id` or `null`, then run cadence (per-conversation fields live in `persistent-memory.json` v2 instead of global state).
+- **Transcript path requirement** — Cadence also requires the transcript file **mtime** to have advanced since the last trigger. That uses **`transcript_path`** from hook input. If Cursor does not supply **`transcript_path`**, mtime cannot be checked and **no** automatic save is suggested (turn/minute thresholds alone are not enough).
+- **persistent-memory-save** — Delegates to **`persistent-memory-saver`**. Hook path: **this chat only**. Manual **`/persistent-memory-save`:** all dirty transcripts for this workspace (`skills/persistent-memory-save/SKILL.md`).
 - **persistent-memory-retrieve** — `/persistent-memory-retrieve` with optional **natural-language** filter. **Default** (no query): rows whose tags include **`#project-<slug>`** for the current workspace, using the **same** dirname + **k-probe** rules as save (`skills/persistent-memory-retrieve/SKILL.md`). Say **`all`** / **`all projects`** to list across projects. Optional trailing number sets row limit (default **10**). Order follows **`sessions.md`** (`End` descending after save).
 
 ## Retrieve example
@@ -83,7 +84,11 @@ Reply with a number (1-2) to load one, or "all" for all shown.
 | `~/.cursor/persistent-memory/incremental-index-*.json` | Optional **manual** snapshots; the save skill may consult them when merging index history |
 | `~/.cursor/persistent-memory/summaries/` | `{conversation_id}.md` structured summaries |
 | `~/.cursor/persistent-memory/transcripts/` | `{conversation_id}.jsonl.gz` compressed raw transcripts |
-| `.cursor/hooks/state/persistent-memory.json` | Per-workspace hook state (turns, last run, transcript mtime, trial window) |
+| `.cursor/hooks/state/persistent-memory.json` | **`version`: 2** — `conversations[conversation_id]` cadence + dedupe (see pruning). v1 file is deleted and replaced with a fresh empty v2. Missing id → key **`unknown`**. Path is resolved from the **stop hook process cwd** (normally the opened workspace folder). |
+
+### Hook state pruning
+
+Each **non-duplicate** Stop (after `generation_id` dedupe and cadence updates) can remove **other** `conversations` entries whose **`lastTranscriptMtimeMs`** is older than **`N` days** (default **`N` = 60** when **`PERSISTENT_MEMORY_CONVERSATIONS_PRUNE_AFTER_DAYS`** is unset). Set **`PERSISTENT_MEMORY_CONVERSATIONS_PRUNE_AFTER_DAYS=0`** to **disable** pruning. That field is the **transcript `.jsonl` mtime** stored when cadence **last fired a follow-up** for that chat (same watermark as `hasTranscriptAdvanced`). Chats that **never** reached a hook trigger keep **`lastTranscriptMtimeMs` null** and are **not** pruned—use **`/persistent-memory-save`** when you care about a session the hook has not fired on yet. The **current** `conversation_id` key is never removed in that pass.
 
 **Git across devices**: Initialize or clone a repo at `~/.cursor/persistent-memory/`, commit summaries and index files as you prefer, and pull on other machines.
 
@@ -99,7 +104,7 @@ Escape literal `|` in a cell as `\|`. **persistent-memory-retrieve** also accept
 
 ## Trigger cadence
 
-A **turn** is one completed user message plus one assistant reply (`status === "completed"`, `loop_count === 0`). The hook also requires the **current transcript file mtime** to have advanced since the last successful trigger.
+A **turn** is one completed user message plus one assistant reply (`status === "completed"`, `loop_count === 0`), with transcript **mtime** advanced since the last trigger **for that `conversation_id`** (cadence is per session). **Requires** a non-empty **`transcript_path`** on the Stop hook payload so the hook can `stat` the `.jsonl` file; without it, **`hasTranscriptAdvanced`** never becomes true and the hook never emits **`followup_message`**.
 
 **Default** (after trial expires, if enabled):
 
@@ -122,6 +127,7 @@ A **turn** is one completed user message plus one assistant reply (`status === "
 | `PERSISTENT_MEMORY_TRIAL_MIN_TURNS` | Min turns during trial | 3 |
 | `PERSISTENT_MEMORY_TRIAL_MIN_MINUTES` | Min minutes during trial | 15 |
 | `PERSISTENT_MEMORY_TRIAL_DURATION_MINUTES` | Trial length | 1440 (24h) |
+| `PERSISTENT_MEMORY_CONVERSATIONS_PRUNE_AFTER_DAYS` | Drop **other** hook-state conversations older than this many days (see **Hook state pruning**); **`0`** = off | **60** |
 
 ## Repository
 

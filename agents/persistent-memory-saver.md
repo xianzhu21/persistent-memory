@@ -14,17 +14,21 @@ Use from `persistent-memory-save` when the Stop hook, `/persistent-memory-save`,
 
 Incrementally update structured session summaries from the **current project's** agent transcripts and persist for `persistent-memory-retrieve`. Output in English only. **Do not truncate**—merge new content with existing summary.
 
-**Write-to-disk contract:** You **MUST** process all transcripts under the current project that need updates. For each transcript (by absolute path): if there is substantive content, write the summary to `~/.cursor/persistent-memory/summaries/{conversation_id}.md`, compress and save the raw transcript to `~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`, and upsert `~/.cursor/persistent-memory/sessions.md` (sessions.md reflects which conversations have summary content); always update `~/.cursor/persistent-memory/incremental-index.json` for processed transcript paths (`transcripts` key, `mtimeMs` + `lastProcessedAt`). Do **not** respond with summaries in chat instead of writing. Exceptions: empty/unreadable transcript or no substantive content — then do **not** write or update the summary file and do **not** add/update that conversation in sessions.md; update the index only. See "When to Skip".
+**Write-to-disk contract:** Task prompt sets scope — **`all`**: every dirty transcript under discovered roots (step 3). **`current-session`**: one transcript only (step 3 “Current session resolution”; Stop hook follow-up usually includes `transcript_path=` / `conversation_id=` when known).
+
+For each transcript you process (by absolute path): if there is substantive content, write the summary to `~/.cursor/persistent-memory/summaries/{conversation_id}.md`, compress and save the raw transcript to `~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`, and upsert `~/.cursor/persistent-memory/sessions.md` (sessions.md reflects which conversations have summary content); always update `~/.cursor/persistent-memory/incremental-index.json` for processed transcript paths (`transcripts` key, `mtimeMs` + `lastProcessedAt`). Do **not** respond with summaries in chat instead of writing. Exceptions: empty/unreadable transcript or no substantive content — then do **not** write or update the summary file and do **not** add/update that conversation in sessions.md; update the index only. See "When to Skip".
 
 ## Inputs
 
+- **Scope:** Task prompt **`PERSISTENT_MEMORY_SCOPE=all`** or **`current-session`**. If upstream includes **`PERSISTENT_MEMORY_TRIGGER=stop-hook`**, use **`current-session`**; otherwise (manual save) use **`all`**. If the scope line is missing, infer the same way from hook token presence.
+- **Optional hints (current-session):** `conversation_id=<full id>` and/or `transcript_path=<absolute path to *.jsonl>` when the parent agent supplies them.
 - **Transcript root(s):** One or more dirs `.../agent-transcripts/` under `~/.cursor/projects/` (see workflow step 1). **Not** always a single slug: opening via a **VS Code workspace** file (`.code-workspace`) usually creates a separate Cursor project folder like `.../<slug>-<workspace-stem>-code-workspace/agent-transcripts/`, while **Open Folder** on the repo uses `.../<slug>/agent-transcripts/` (same disk tree, different project slug).
 - **Incremental index:** `~/.cursor/persistent-memory/incremental-index.json`
 - **Summary dir:** `~/.cursor/persistent-memory/summaries/`
 - **Transcript archive dir:** `~/.cursor/persistent-memory/transcripts/`
 - **Session list:** `~/.cursor/persistent-memory/sessions.md`
 
-No `conversation_id` or `transcript_path` from outside—discover everything from the project's transcript root(s).
+Discover transcript roots from the project context. For **`all`**, discover every candidate transcript path from those roots. For **`current-session`**, also resolve the single target file per **Current session resolution** (hints or fallback).
 
 ## Workflow
 
@@ -41,9 +45,23 @@ No `conversation_id` or `transcript_path` from outside—discover everything fro
    Collect transcript paths under the transcript root (dedupe by absolute path):
    - **Nested layout (common):** each subdir named `conversation_id` with file `{transcript_root}/{conversation_id}/{conversation_id}.jsonl`.
    - **Flat layout:** some Cursor/project folders store `{transcript_root}/{conversation_id}.jsonl` directly (no subdir). Include every such `*.jsonl` at the root of `agent-transcripts/` whose basename (without `.jsonl`) looks like a conversation id (e.g. UUID). Do **not** skip these; they are the same artifact type as nested files.
-   Resolve each file to its **absolute path**. Process only:
+   Resolve each file to its **absolute path**.
+
+   **Current session resolution (`PERSISTENT_MEMORY_SCOPE=current-session` only)**  
+   After you have the **full** candidate set from the roots above, determine **exactly one target transcript path** for this run (do not process others):
+   1. If **`transcript_path=…`** is given and points to a `*.jsonl` that lies under one of the discovered `agent-transcripts` roots (prefix match on absolute path), use that path.
+   2. Else if **`conversation_id=…`** is given, use the existing candidate path whose basename (flat) or parent directory name (nested) equals that id.
+   3. Else **fallback:** among all candidate `*.jsonl` paths, choose the file with the **largest** `mtimeMs`; if tied, choose the **lexicographically greatest** absolute path (deterministic). Note in the outcome that fallback was used so the user can supply `conversation_id` or `transcript_path` next time if the wrong chat was picked.
+
+   Then **replace** the candidate list with either:
+   - **`PERSISTENT_MEMORY_SCOPE=all`:** keep the full deduped list (unchanged).
+   - **`PERSISTENT_MEMORY_SCOPE=current-session`:** keep **only** the single target path, **if** it exists; if it does not exist or is not under the roots, respond with an error outcome and do not process other files.
+
+   Process only paths that still need work under the incremental index:
    - transcripts **not** in the index (process full file), or
    - transcripts whose file **mtime** is newer than `index.transcripts[abs_path].mtimeMs` (process full file).
+
+   For **`current-session`**, if the single target is already up to date in the index, respond exactly: `No session summary generated (no substantive content); index updated.` (or state that this session’s transcript had no pending incremental work) and still ensure the index on disk is consistent—do **not** scan other transcripts to “find work.”
 
 4. **For each transcript that needs an update**
    - Read the **full** transcript file. Derive `conversation_id` from the path (e.g. parent dir name or filename without `.jsonl`).
@@ -115,7 +133,7 @@ Branch, remote. Omit if not relevant.
 #project-<workspace-slug> #tag1 #tag2
 ```
 
-- Use `##` for sections; omit sections with no content. At minimum keep `# title`, `## Summary`, `## Transcript` (with archive path), `## Tags`. **NEVER omit** `## Transcript` — it points to the `.jsonl.gz` for retrieval. **NEVER omit `## Transcript`** — it must contain the archive path. **NEVER omit `## Transcript`** — it must contain the archive path so `persistent-memory-retrieve` can load the raw transcript.
+- Use `##` for sections; omit sections with no content. At minimum keep `# title`, `## Summary`, `## Transcript` (with archive path), `## Tags`. **Always include `## Transcript`** with the `.jsonl.gz` path so retrieval can load the raw transcript.
 - **Summary H1 — `{start}` and `{end}`:** Use the **same semantics and values** as the **Start** and **End** fields in `sessions.md` (see Session List Update). Format both as `YYYY-MM-DDTHHMM` (local wall time derived from the chosen epoch fields). **`{start}`:** transcript `.jsonl` file birth time (e.g. `stat -c %W` on Linux, `stat -f %B` on macOS); if birth is unknown or `0`, use the transcript file **mtime** for both `{start}` and `{end}`. **`{end}`:** transcript `.jsonl` file **mtime** (last modification of the conversation artifact), e.g. `stat -c %Y` then convert to `YYYY-MM-DDTHHMM`—**not** the wall-clock time when running save, and **not** "summary last rewritten." On incremental merges, recompute `{end}` from the current transcript mtime whenever you write the summary; keep `{start}` from birth unless birth was never available (then keep using mtime for start as above).
 - **Descriptive title:** The third segment after `{start} | {end} |`. **Scale length to the session**—there is **no** minimum or target character count. A **small** change or narrow question can use a **short** title if it is still specific; a **long** investigation should use a **longer** title with enough clauses (commas or semicolons) to separate topics, outcomes, and differentiators. Judge by **practice**: include what a future you needs to pick this row out of similar ones (topic, outcome, ticket/CL/file/skill when relevant). **Do not** pad length; **do not** omit important detail just to stay brief. Avoid vague one-liners when the transcript contains concrete specifics (e.g. prefer "SurfaceFlinger parallel_refresh RE log, drawSummary fix, XHMI-12345" over "SF log analysis" when that is what happened).
 - **Multi-topic sessions (MUST):** One `conversation_id` can contain **several** substantive threads (e.g. Notion **Task A** then **Task B**, or Jira import then a different **`/van`**). This is **not** optional to capture.
