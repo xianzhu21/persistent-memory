@@ -1,15 +1,21 @@
 ---
 name: persistent-memory-retrieve
-description: "Use when the user runs /persistent-memory-retrieve or asks to browse, search, or load persisted session summaries from ~/.cursor/persistent-memory (sessions list, pick by number, inject full summary). Default scope is current workspace; optional natural-language filter; default list size 10 rows; say all or all projects for every workspace."
+description: "List and load user-session summaries from ~/.cursor/persistent-memory for recall and handoff (not subagent tool logs; prefer project-tagged scope unless user asks for all projects)."
 ---
 
 # Persistent Memory Retrieve
 
-Browse and load past session summaries into the current context. Use when the user types `/persistent-memory-retrieve` or `/persistent-memory-retrieve` followed by a natural-language query.
+**Why:** Answer “what we did / decided before” by surfacing **saved user chats** (structured summaries + optional gzip), not re-scanning the whole `agent-transcripts` tree. **Scenarios:** resume a feature months later, compare two investigations, or paste a prior **## Decisions** / **## References** into the current task.
+
+**How:** Read `sessions.md` → filter (default: **#project-…** for this workspace) → let the user pick a row → read `summaries/{id}.md` (and gzip only if they need line-level replay).
+
+Use when the user types `/persistent-memory-retrieve` or a natural-language recall query (with or without filters).
 
 ## Workflow
 
-1. **Read session list** from `~/.cursor/persistent-memory/sessions.md`
+1. **Read session list** from `~/.cursor/persistent-memory/sessions.md`  
+   - If the user says a row is useless, **subagent** runs may have been summarized before the policy: titles that look like “run the full save flow” for **IDs** that match **subagent** delegation are often **worker logs**, not user project work. Prefer the **parent** session from the same window when the user is looking for “what I did” in a repo.
+   - **Legacy summary files** may still contain a **second** `#` H1 or “## Incremental merge / ## Superseded” blocks (pre–full-re-synthesis). When you **read** `~/.cursor/persistent-memory/summaries/{id}.md` to answer a pick: treat **only the first** canonical `# {start} | {end} | {title}` block and the following `##` sections **until** a horizontal rule `---` or a line starting with `## Superseded` / `## Incremental merge` as the **authoritative** summary; **do not** treat later duplicate H1s or URL dumps in stale tails as the main session (point the user to gzip for raw replay if the tail is noisy).
 2. **Parse lines** – build the session list from `sessions.md` in file order (top to bottom). After a successful `persistent-memory-save`, data rows are **sorted by `End` descending**; scanning top to bottom is therefore newest-`End` first (legacy or hand-edited files may be unsorted; in that case you may sort by `End` descending when displaying for consistency).
    - **Markdown table (current):** Ignore the `#` heading, blank lines, the header row `| ID | Start | …`, and the separator row `| --- | …`. For each following line that starts with `|`, parse **five cells** (split on `|`, trim; treat `\|` inside a cell as a literal pipe). Skip malformed rows.
    - **Legacy plain lines:** `{id_prefix} | {start} | {end} | {title} | {tags}` (5 fields) or `{id_prefix} | {end} | {title} | {tags}` (4 fields). If 4 fields, treat the single timestamp as end only. Use for files not yet converted to a table.
@@ -80,7 +86,7 @@ No session memories found. Summaries are created automatically when you have lon
 
 ## Stub / thin summaries
 
-If a `summaries/{id}.md` file is only a **tooling placeholder** (e.g. "Batch save", "N text segments") while the gzip transcript is large and substantive, tell the user the summary is **out of date** and they should run **`/persistent-memory-save`** again from the **same workspace** where that chat lives (or **all projects**), so the save skill can **merge** real `## Key findings` / `## Decisions` from the full JSONL. Root cause is often **wrong transcript slug** (single-folder vs `.code-workspace`); fixed in `persistent-memory-save` step 1.
+If a `summaries/{id}.md` file is only a **tooling placeholder** (e.g. "Batch save", "N text segments") while the gzip transcript is large and substantive, tell the user the summary is **out of date** and they should run **`/persistent-memory-save`** again from the **same workspace** where that chat lives (default **`existing-summaries`** only picks ids with **`lastTranscriptMtimeMs` not null** in `.cursor/hooks/state/persistent-memory.json`; if that field is still null, rely on the Stop hook **`current-session`** path once cadence promotes the chat). Root cause is often **wrong transcript slug** (single-folder vs `.code-workspace`); fixed in `persistent-memory-save` / saver step 1.
 
 ## Examples
 
