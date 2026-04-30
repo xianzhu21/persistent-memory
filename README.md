@@ -108,8 +108,8 @@ A **turn** is one completed user message plus one assistant reply (`status === "
 
 **Default** (after trial expires, if enabled):
 
-- At least **10** completed turns since last run
-- At least **120** minutes since last run
+- At least **8** completed turns since last run
+- At least **60** minutes since last run
 
 **Trial mode** — `bun run …/persistent-memory-stop.ts --trial` **or** `PERSISTENT_MEMORY_TRIAL_MODE=true`:
 
@@ -121,8 +121,8 @@ A **turn** is one completed user message plus one assistant reply (`status === "
 
 | Variable | Purpose | Default |
 |----------|---------|--------|
-| `PERSISTENT_MEMORY_MIN_TURNS` | Min turns (outside trial window) | 10 |
-| `PERSISTENT_MEMORY_MIN_MINUTES` | Min minutes since last run | 120 |
+| `PERSISTENT_MEMORY_MIN_TURNS` | Min turns (outside trial window) | 8 |
+| `PERSISTENT_MEMORY_MIN_MINUTES` | Min minutes since last run | 60 |
 | `PERSISTENT_MEMORY_TRIAL_MODE` | Enable trial without `--trial` | false |
 | `PERSISTENT_MEMORY_TRIAL_MIN_TURNS` | Min turns during trial | 3 |
 | `PERSISTENT_MEMORY_TRIAL_MIN_MINUTES` | Min minutes during trial | 15 |
