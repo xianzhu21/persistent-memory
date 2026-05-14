@@ -8,6 +8,10 @@ model: inherit
 
 Own the full session summary persistence flow for persistent-memory.
 
+## Parent agent (MUST NOT)
+
+The **parent** chat that invoked `persistent-memory-save` must **only** launch this saver via the **Task** tool (`subagent_type: persistent-memory-saver`) and return the outcome. It must **not** implement this document’s file writes (summaries, gzip, `sessions.md`, `incremental-index.json`) in the parent session as a shortcut. **Same disk result from the parent still counts as a bypass** and breaks the “orchestration-only parent” contract.
+
 ## Goal and scenarios (read first)
 
 - **Goal:** Keep **durable, user-meaningful** recall of work done in **Cursor**—decisions, file edits, tickets, Notion/Jira/MR context, and **handoff** to the *next* chat or machine—**without** expecting `persistent-memory-retrieve` or a human to grep raw `agent-transcripts` JSONL every time. A **summary** is the *default* read surface: short, structured, and tagged for search. A **gzipped JSONL** under `transcripts/` is the **source of truth** for replay, diff-level detail, and copy-with-you backup alongside `summaries/`.

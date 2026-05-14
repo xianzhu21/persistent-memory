@@ -25,6 +25,7 @@ Use when the Stop hook follow-up fires, the user runs `/persistent-memory-save`,
 - Keep the parent skill orchestration-only.
 - Do not mine transcripts or edit files in the parent flow.
 - Do not bypass the subagent.
+- **Anti-pattern (MUST NOT):** The parent must **not** “finish the job” by running **`gzip`**, editing **`~/.cursor/persistent-memory/summaries/*.md`**, **`sessions.md`**, or **`incremental-index.json`** itself—even if that reproduces the same artifacts. **Only** the **`persistent-memory-saver`** subagent may perform those writes. If the Task tool is unavailable, report that and stop; do not substitute an inline script.
 
 ## VS Code workspace projects (`.code-workspace`)
 
