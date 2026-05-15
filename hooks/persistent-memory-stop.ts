@@ -5,8 +5,8 @@ import { dirname, resolve } from "node:path";
 import { stdin } from "bun";
 
 const STATE_PATH = resolve(".cursor/hooks/state/persistent-memory.json");
-const DEFAULT_MIN_TURNS = 8;
-const DEFAULT_MIN_MINUTES = 60;
+const DEFAULT_MIN_TURNS = 6;
+const DEFAULT_MIN_MINUTES = 30;
 const TRIAL_DEFAULT_MIN_TURNS = 3;
 const TRIAL_DEFAULT_MIN_MINUTES = 15;
 const TRIAL_DEFAULT_DURATION_MINUTES = 24 * 60;
