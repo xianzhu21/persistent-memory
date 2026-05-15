@@ -1,6 +1,6 @@
 ---
 name: persistent-memory-saver
-description: Update session summaries from project transcripts; full re-synthesis into summaries/*.md (single H1), gzip archives, sessions.md, and ~/.cursor/persistent-memory/incremental-index.json.
+description: Update session summaries from project transcripts; full re-synthesis into summaries/*.md (single H1), gzip archives, sessions.md (with catalog reconciliation to summaries on disk), and ~/.cursor/persistent-memory/incremental-index.json.
 model: inherit
 ---
 
@@ -31,9 +31,9 @@ Use from `persistent-memory-save` when the Stop hook, `/persistent-memory-save`,
 
 Incrementally update structured session summaries from Cursor **parent** agent transcripts and persist for `persistent-memory-retrieve`. Output in English only. **Do not truncate** session *meaning* (capture multi-topic and full decisions). The **on-disk** summary for each `conversation_id` is a **single document** with **one** top-level `#` H1 (see **Merge and full re-synthesis (MUST)** and **Output Format**).
 
-**Write-to-disk contract:** Task prompt sets scope — **`explicit-transcript`**: single absolute parent **`*.jsonl`** from **`transcript_path=`** (step 3; no hook state, no step‑1 root filter for *inclusion*—path is authoritative). **`existing-summaries`**: only parent transcripts under step‑1 roots for `conversation_id`s in **`.cursor/hooks/state/persistent-memory.json`** with **`lastTranscriptMtimeMs` not null** (step 3; no full tree walk, no **`summaries/`** glob). **`current-session`**: full tree walk under discovered roots (step 3), then **exactly one** target transcript via “Current session resolution” (Stop hook follow-up usually includes `transcript_path=` / `conversation_id=` when known).
+**Write-to-disk contract:** Task prompt sets scope — **`explicit-transcript`**: single absolute parent **`*.jsonl`** from **`transcript_path=`** (step 3; no hook state, no step‑1 root filter for *inclusion*—path is authoritative). **`existing-summaries`**: only parent transcripts under step‑1 roots for `conversation_id`s in **`.cursor/hooks/state/persistent-memory.json`** with **`lastTranscriptMtimeMs` not null** (step 3; no full tree walk for *transcript discovery*—do **not** use a **`summaries/`** glob to build the step‑3 candidate list). **`current-session`**: full tree walk under discovered roots (step 3), then **exactly one** target transcript via “Current session resolution” (Stop hook follow-up usually includes `transcript_path=` / `conversation_id=` when known). **After** step 4, **every** run performs **Catalog reconciliation (MUST)** so `sessions.md` stays aligned with on-disk `summaries/*.md` (see that section)—including when no transcript needed reprocessing.
 
-For each transcript you process (by absolute path): if there is substantive content, write the summary to `~/.cursor/persistent-memory/summaries/{conversation_id}.md`, compress and save the raw transcript to `~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`, and upsert `~/.cursor/persistent-memory/sessions.md` (sessions.md reflects which conversations have summary content); always update `~/.cursor/persistent-memory/incremental-index.json` for processed transcript paths (`transcripts` key, `mtimeMs` + `lastProcessedAt`). Do **not** respond with summaries in chat instead of writing. Exceptions: empty/unreadable transcript, **subagent process logs** (path contains a `subagents` segment under `agent-transcripts/`—see step 4), or no substantive content — then do **not** write or update the summary file and do **not** add/update that conversation in sessions.md; update the index only. See "When to Skip".
+For each transcript you process (by absolute path): if there is substantive content, write the summary to `~/.cursor/persistent-memory/summaries/{conversation_id}.md`, compress and save the raw transcript to `~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`, and upsert `~/.cursor/persistent-memory/sessions.md` (sessions.md reflects which conversations have summary content); always update `~/.cursor/persistent-memory/incremental-index.json` for processed transcript paths (`transcripts` key, `mtimeMs` + `lastProcessedAt`). Do **not** respond with summaries in chat instead of writing. Exceptions: empty/unreadable transcript, **subagent process logs** (path contains a `subagents` segment under `agent-transcripts/`—see step 4), or no substantive content — then do **not** write or update the summary file and do **not** add/update that conversation in sessions.md **during step 4** (table upserts from the transcript loop only); update the index only. **Catalog reconciliation** afterward may still append a **`sessions.md`** row if a matching **`summaries/{conversation_id}.md`** already exists on disk—see **When to Skip** and **Catalog reconciliation (MUST)**.
 
 ## Inputs
 
@@ -50,7 +50,7 @@ For each transcript you process (by absolute path): if there is substantive cont
 - **Transcript archive dir:** `~/.cursor/persistent-memory/transcripts/`
 - **Session list:** `~/.cursor/persistent-memory/sessions.md`
 
-Discover transcript roots from the project context (step 1). For **`explicit-transcript`**, step 1 is **not** used to *build* the candidate list (the user path is enough); tags and **`#project-…`** still come from that path’s **`…/.cursor/projects/<workspace-folder>/agent-transcripts/…`** segment. For **`existing-summaries`**, read hook state JSON (step 3), keep ids with **`lastTranscriptMtimeMs` not null**, and map each to parent JSONL paths under those roots only (no full tree walk, no **`summaries/`** directory listing). For **`current-session`**, perform the step‑3 tree walk under those roots, then resolve the single target file per **Current session resolution** (hints or fallback).
+Discover transcript roots from the project context (step 1). For **`explicit-transcript`**, step 1 is **not** used to *build* the candidate list (the user path is enough); tags and **`#project-…`** still come from that path’s **`…/.cursor/projects/<workspace-folder>/agent-transcripts/…`** segment. For **`existing-summaries`**, read hook state JSON (step 3), keep ids with **`lastTranscriptMtimeMs` not null**, and map each to parent JSONL paths under those roots only (no full tree walk; **do not** use **`summaries/`** to choose which transcripts to read in step 3—reconciliation handles the catalog separately). For **`current-session`**, perform the step‑3 tree walk under those roots, then resolve the single target file per **Current session resolution** (hints or fallback).
 
 ## Workflow
 
@@ -74,11 +74,11 @@ Discover transcript roots from the project context (step 1). For **`explicit-tra
    4. If the file is missing or not readable, respond with an error outcome.
    5. Otherwise the **candidate list** is exactly **one** absolute path (that file). **Do not** require it to appear under step‑1 transcript roots for this workspace.
 
-   **`PERSISTENT_MEMORY_SCOPE=existing-summaries` (manual default)** — **no** full tree walk under `agent-transcripts/`, and **do not** glob **`~/.cursor/persistent-memory/summaries/*.md`** (use hook state only for the id set):
+   **`PERSISTENT_MEMORY_SCOPE=existing-summaries` (manual default)** — **no** full tree walk under `agent-transcripts/`, and **do not** glob **`~/.cursor/persistent-memory/summaries/*.md`** to build the **transcript** candidate list (use hook state only for that id set). **Catalog reconciliation** still lists `summaries/*.md` later—see **Catalog reconciliation (MUST)**.
    1. Read **`<workspace-root>/.cursor/hooks/state/persistent-memory.json`**, where **`<workspace-root>`** is the workspace folder that contains this project’s **`.cursor/hooks/`** (same cwd the Stop hook uses). If the file is missing, unreadable, or lacks a top-level **`conversations`** object (plain object, not an array), respond with a brief error outcome: ensure the Stop hook has run in this workspace (it creates this file) or fix the path.
    2. For each **`conversation_id`** key in **`conversations`**: skip **`unknown`** and empty keys. Read **`lastTranscriptMtimeMs`** from the entry. **Include** the id **iff** **`lastTranscriptMtimeMs` is not null** — concretely: it is a **finite number** (the Stop hook writes transcript **mtime ms** when cadence fires; JSON **`null`**, missing field, or non-numeric → **exclude**). This matches “hook has promoted persistent save for this chat at least once.”
    3. For each included id, under **each** transcript root from step 1, resolve **parent** transcript paths only: prefer nested **`{root}/{id}/{id}.jsonl`** if it exists, else flat **`{root}/{id}.jsonl`**. If **neither** exists under any root, **skip** that id. **Do not** add **`…/subagents/`** paths.
-   4. The **candidate list** is the **deduped** set of absolute paths from step 3. If **no** id passes step 2, or **no** path resolves under the roots, the candidate list is empty—respond with **`No session summary generated (no substantive content); index updated.`** (or one line that no **`lastTranscriptMtimeMs`**-qualified ids mapped to transcripts here). **Do not** run the subagent-inclusive tree walk below.
+   4. The **candidate list** is the **deduped** set of absolute paths from step 3. If **no** id passes step 2, or **no** path resolves under the roots, the candidate list is **empty**—this is **not** an early exit: continue with incremental selection (nothing queued), **step 4** (iterate zero transcripts), then **step 5** including **Catalog reconciliation**. Note in the outcome when no **`lastTranscriptMtimeMs`**-qualified ids mapped to JSONL paths. **Do not** run the subagent-inclusive tree walk below.
 
    **`PERSISTENT_MEMORY_SCOPE=current-session` only** — full discovery (dedupe by absolute path). **Skip** this entire subsection when scope is **`existing-summaries`** or **`explicit-transcript`**.
    - **Nested layout (common):** each subdir named `conversation_id` with file `{transcript_root}/{conversation_id}/{conversation_id}.jsonl`.
@@ -101,11 +101,11 @@ Discover transcript roots from the project context (step 1). For **`explicit-tra
    - transcripts **not** in the index (process full file), or
    - transcripts whose file **mtime** is newer than `index.transcripts[abs_path].mtimeMs` (process full file).
 
-   For **`current-session`**, if the single target is already up to date in the index, respond exactly: `No session summary generated (no substantive content); index updated.` (or state that this session’s transcript had no pending incremental work) and still ensure the index on disk is consistent—do **not** scan other transcripts to “find work.”
+   For **`current-session`**, if the single target is already up to date in the index, **still** run steps 4–5: step 4 may only refresh index consistency; **step 5** must run **Catalog reconciliation** before the final outcome. Do **not** scan other transcripts to “find work.” Use the canned **`No session summary generated (no substantive content); index updated.`** wording **only** if step 5 permits it (see step 5).
 
-   For **`existing-summaries`**, if the candidate list is **empty** (no **`lastTranscriptMtimeMs`**-qualified ids, no JSONL under roots, or all up to date in the index), respond with the same **`No session summary generated (no substantive content); index updated.`** outcome; do **not** fall back to a full tree walk.
+   For **`existing-summaries`**, if the candidate list is **empty** (no **`lastTranscriptMtimeMs`**-qualified ids, no JSONL under roots, or all up to date in the index), **do not** fall back to a full tree walk for transcript discovery; **still** execute steps 4–5 (step 4 may process nothing). **Catalog reconciliation** in step 5 may add missing **`sessions.md`** rows from **`summaries/*.md`**. Final wording follows **Canned “no work” response** in step 5 (same predicate as the Stop hook follow-up).
 
-   For **`explicit-transcript`**, if the single file is **already up to date** in the incremental index (mtime not newer than indexed `mtimeMs`), respond with the same **`No session summary generated (no substantive content); index updated.`** wording (or state explicitly no pending incremental work for that path); do **not** scan other transcripts.
+   For **`explicit-transcript`**, if the single file is **already up to date** in the incremental index (mtime not newer than indexed `mtimeMs`), **still** run steps 4–5 (step 4 may touch nothing) and **Catalog reconciliation**; **do not** scan other transcripts. Final wording per step 5.
 
 4. **For each transcript that needs an update**
    - **Subagent transcripts (MUST, first check):** If the absolute path contains a path segment named **`subagents` under an `agent-transcripts` root** (e.g. `.../agent-transcripts/000c7…/subagents/0df8721a-….jsonl`), it is a **subagent or delegated worker run**, not a user “session” for memory. **Do not** read it for a narrative summary, **do not** write or update `summaries/{conversation_id}.md`, **do not** write `transcripts/{conversation_id}.jsonl.gz`, and **do not** change `sessions.md`. **Do** set `incremental-index.json` for that path to the current `mtimeMs` and `lastProcessedAt`, then **continue to the next file**. Rationale: user value lives in the **parent** thread (`.../{conversation_id}/{conversation_id}.jsonl`), not in internal task logs. **Do not** use “the subagent edited many files” as a reason to summarize; capture outcomes in the **parent** (or a non-`subagents/`) transcript.
@@ -118,18 +118,21 @@ Discover transcript roots from the project context (step 1). For **`explicit-tra
        2. **Write** the summary to `~/.cursor/persistent-memory/summaries/{conversation_id}.md` following **Merge and full re-synthesis (MUST)** and **Output Format**. The file MUST include a `## Transcript` section with:
           `~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz` — raw transcript (gzip). Load with `gzip -dc <path>`.
        3. **Archive transcript:** `gzip -c "<absolute_path_to_transcript.jsonl>" > ~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`
-     - If the content has **no substantive content** (e.g. only a single command, no decisions/findings/edits): do **not** write or update the summary file; do **not** add/update this conversation in sessions.md; do **not** archive the transcript.
-     - **Low-value command-only runs are non-substantive by default:** if the conversation is primarily executing `/persistent-memory-save` or `/persistent-memory-retrieve` and does **not** modify persistent-memory implementation or skills, treat it as no substantive content. In this case, do **not** write/update summary, do **not** update sessions.md, and do **not** archive transcript.
+     - If the content has **no substantive content** (e.g. only a single command, no decisions/findings/edits): do **not** write or update the summary file; do **not** add/update this conversation in sessions.md **in step 4**; do **not** archive the transcript.
+     - **Low-value command-only runs are non-substantive by default:** if the conversation is primarily executing `/persistent-memory-save` or `/persistent-memory-retrieve` and does **not** modify persistent-memory implementation or skills, treat it as no substantive content. In this case, do **not** write/update summary, do **not** update sessions.md **in step 4**, and do **not** archive transcript.
      - **Exception (recordable):** if the same conversation includes meaningful changes to persistent-memory behavior (for example `skills/persistent-memory-save/SKILL.md`, `agents/persistent-memory-saver.md`, `skills/persistent-memory-retrieve/SKILL.md`, `hooks/persistent-memory-stop.ts`, plugin config, or related code/docs with decisions/findings), then it is substantive and should be summarized normally.
      - **Always** for this transcript (even when no substantive content, for this non-subagent file): update `incremental-index.json` for the transcript's **absolute path** with `mtimeMs` = current file mtime (ms since epoch), `lastProcessedAt` = current ISO timestamp. Only when a summary was **written** for this conversation: upsert `sessions.md` (one **markdown table row**; **`{end}` from transcript mtime—see Session List Update**).
 
 5. **Write back**
-   Save `incremental-index.json` and `sessions.md` after processing. **CRITICAL:** If any transcripts were processed (including those with no substantive content), you MUST update and persist the index so the next run skips them until their file mtime changes. If no transcripts needed updates or all had no substantive content, respond exactly: `No session summary generated (no substantive content); index updated.`
+   Save `incremental-index.json` after step 4 as required. **Before** finalizing the outcome, run **Catalog reconciliation (MUST)** (may rewrite **`sessions.md`** even when no transcript was processed). **CRITICAL:** If any transcripts were processed in step 4 (including those with no substantive content), you MUST update and persist the index so the next run skips them until their file mtime changes.
+
+   **Canned “no work” response:** Use `No session summary generated (no substantive content); index updated.` **only** when **both** are true: (a) step 4 did **not** write or update any file under **`~/.cursor/persistent-memory/summaries/`** (no new or merged **`*.md`** there), **and** (b) catalog reconciliation made **no** change to **`sessions.md`**. Index-only updates in step 4 (e.g. subagent paths, skip cases) **do not** block this canned line when (a) and (b) still hold. If reconciliation **added** rows from existing summaries on disk, report that instead (e.g. `Catalog reconciliation: added N row(s) to sessions.md from summaries/*.md.`) and mention index status accurately.
 
 6. **Before completing**
-   For each conversation for which you wrote a summary, verify:
+   For each conversation for which you wrote a summary in step 4, verify:
    - `summaries/{conversation_id}.md` exists, contains **exactly one** top-level `#` H1 (see **Merge and full re-synthesis (MUST)**), and contains `## Transcript` with the correct path
    - `transcripts/{conversation_id}.jsonl.gz` exists. If missing, run: `gzip -c "<abs_path_to_jsonl>" > ~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`
+   After **Catalog reconciliation**, every **`summaries/*.md`** session file (same H1 parse rules as reconciliation) should have a matching **`sessions.md`** row by **`conversation_id[:8]`** unless listed in the outcome as skipped (malformed file).
 
 ## Output Format
 
@@ -249,7 +252,7 @@ Path: `~/.cursor/persistent-memory/transcripts/{conversation_id}.jsonl.gz`
 
 File: `~/.cursor/persistent-memory/sessions.md`
 
-sessions.md lists **conversations that have summary content** (i.e. a written `{conversation_id}.md`). Update it only when you write or update a summary for a conversation; do not add/update a line when the run produced no substantive content for that conversation.
+sessions.md lists **conversations that have summary content** (i.e. a written `{conversation_id}.md`). **During step 4**, add or refresh a row **only** when you **write or update** that conversation’s summary from a transcript. **Additionally**, **Catalog reconciliation (MUST)** may add rows **without** a new summary write by copying H1 + tags from existing `summaries/*.md` so the table catches up to disk.
 
 **Format — markdown sheet (GFM table):** The file is a single table, not pipe-separated plain lines.
 
@@ -268,7 +271,36 @@ sessions.md lists **conversations that have summary content** (i.e. a written `{
 - **Tags:** Same as the summary `## Tags`: **`#project-<slug>` first** (canonical dirname from this transcript’s path — folder vs `.code-workspace` — see Output Format), then **up to 3** semantic topic tags, space-separated (e.g. `#project-mnt-2tb-monalisadesign-gloable #surfaceflinger #parallel-refresh`).
 - **Cell escaping:** If `{title}` or `{tags}` contains a literal `|` (pipe), write it as `\|` inside the cell so the table stays valid.
 - **Upsert:** Load all existing data rows. Replace the row whose **ID** cell equals `{conversation_id[:8]}` with the new cells, or **append** one row if no match. Then **rewrite the full table**: heading, header, separator, then **all data rows sorted by `End` descending** (then `Start` descending, then `ID` ascending per tie-breakers above). Do not duplicate the table or leave rows out of order.
+- **ID prefix:** Rows are keyed by the first **8** characters of the full `conversation_id` (UUID). Two different full ids **could** share the same eight-character prefix in theory; if you ever see two **different** summaries competing for one **ID** cell, stop auto-merging that id, list both basenames in the outcome, and leave resolution to the user.
 - **Legacy:** If you encounter an old plain-line file (`id | start | end | title | tags` without leading `|`), rewrite the whole file to this table format on the next save.
+
+## Catalog reconciliation (MUST)
+
+**Why:** A `summaries/{conversation_id}.md` can exist **without** a **`sessions.md`** row (partial saver run, index advanced without a table write, git merge skew, hand-edited table, parent bypass). Incremental transcript rules then **skip** that JSONL until its mtime changes, so the catalog does not self-heal unless this pass runs.
+
+**When:** **Every** saver run, **after** step 4 finishes and **before** the final user-facing outcome—even if the transcript candidate list was empty, all files were index-only skips, or **`No session summary generated`** would otherwise apply.
+
+**What (no JSONL re-read; rows from summary H1 + tags only):**
+
+1. Ensure **`~/.cursor/persistent-memory/sessions.md`** uses the GFM table layout in **Session List Update** (create or normalize heading, header, separator if missing).
+2. Parse all **data** rows and build **`table_ids`**: the set of **ID** cell values (8-char prefixes; see **Session List Update → ID prefix**).
+3. List **`~/.cursor/persistent-memory/summaries/*.md`**. For each file, **`conversation_id`** = basename without **`.md`**. If **`conversation_id[:8]`** ∈ **`table_ids`**, skip (row already present for that prefix).
+4. **Missing row:** Read the summary. Parse the **first** file-top **`#` H1** as **`# {start} | {end} | {title}`** (three pipe-separated segments after the leading `#`). If unparseable, **skip** and list the basename under **reconciliation skipped (malformed H1)** in the outcome—**do not** invent Start/End/Title from the filename.
+5. **Tags cell:** Take the same value as **`## Tags`** in the summary (the line(s) of tag tokens after that heading; space-separated). If **`## Tags`** is missing or empty, use **`#project-unknown`**.
+6. **Append row** per **Session List Update** (pipe-escape **`{title}`** / **`{tags}`** if they contain literal **`|`**). Add **`conversation_id[:8]`** to **`table_ids`** so the same run does not duplicate.
+7. **Rewrite** the full table: heading, header, separator, then **all** data rows sorted by **`End`** descending (same tie-breakers as **Session List Update**). Merge **with** any rows step 4 already upserted in this run (single coherent table state).
+8. **Write `sessions.md`** to disk whenever reconciliation changed the merged row set—even if step 4 wrote no summaries.
+
+**Subagent / worker summaries (do not catalog):** After reading the file, **do not** append a **`sessions.md`** row if **either** holds:
+
+1. Under **`## Transcript`**, the first non-empty line that contains **`/`** (the archived or source path) includes the substring **`/subagents/`** (normalized slashes).
+2. Under **`## Workspace`**, the first non-empty line that contains **`/`** includes **`/subagents/`**.
+
+If **`## Transcript`** is missing, treat rule 1 as **not** matched by path; still apply rule 2 when **`## Workspace`** is present.
+
+List skipped basenames under **reconciliation skipped (subagent summary)** in the outcome. Otherwise orphan **parent** summaries should get a row.
+
+**Catalog completeness (forward-only):** After reconciliation, **every** `summaries/*.md` on disk that is **eligible** (parseable file-top H1; not skipped by the subagent rules above) has a **`sessions.md`** row whose **ID** cell equals **`conversation_id[:8]`** for that file’s basename. This pass **only adds** missing rows; it does **not** delete **`sessions.md`** rows when a summary file was removed, renamed, or replaced—stale catalog rows are **optional user cleanup**. Malformed summaries skipped under **reconciliation skipped (malformed H1)** are excluded from the completeness check.
 
 ## Transcript Parsing
 
@@ -279,9 +311,11 @@ sessions.md lists **conversations that have summary content** (i.e. a written `{
 
 ## When to Skip (per conversation)
 
+These rules apply to **step 4** transcript handling and to **step‑4 `sessions.md` upserts** (rows written when a summary is produced or refreshed from a transcript). They do **not** forbid **Catalog reconciliation** from later appending a row copied from an **existing** `summaries/*.md` on disk when the table is missing that prefix—see **Catalog reconciliation (MUST)**.
+
 - **Subagent process log (`/subagents/` in path):** Same as “no user summary” by policy—**never** create or update `summaries/`, `transcripts/*.gz`, or `sessions.md` for these paths; **only** update the index so future runs do not re-queue them. If a mistaken summary/row was created in the past, removal is **optional** (user-asked maintenance); standard runs do not bulk-delete.
-- **Empty or unreadable transcript:** Do not create a summary file. Update index for that transcript path with current `mtimeMs` and `lastProcessedAt` = now; do not add/update that conversation in sessions.md.
-- **No substantive content** in the transcript (e.g. only a single command, no decisions/findings/edits): Do **not** write or update the summary file; do **not** add/update that conversation in sessions.md (sessions.md represents summary content). **Must still** update `incremental-index.json` for that transcript path (and save it in step 5) so the next run skips it until the file changes.
+- **Empty or unreadable transcript:** Do not create a summary file. Update index for that transcript path with current `mtimeMs` and `lastProcessedAt` = now; do not add/update that conversation in sessions.md **in step 4**.
+- **No substantive content** in the transcript (e.g. only a single command, no decisions/findings/edits): Do **not** write or update the summary file; do **not** add/update that conversation in sessions.md **in step 4** (sessions.md represents summary content from the transcript loop). **Must still** update `incremental-index.json` for that transcript path (and save it in step 5) so the next run skips it until the file changes.
 - **Command-noise guard:** Treat pure `/persistent-memory-save` or `/persistent-memory-retrieve` execution logs as **no substantive content** unless the conversation also contains meaningful persistent-memory skill/code/config modifications or durable decisions/findings.
 
-If **no** transcripts needed updates or **all** fell into the skip cases above, respond exactly: `No session summary generated (no substantive content); index updated.`
+If step 4 did **not** write or update any **`summaries/*.md`** and **Catalog reconciliation** did not change **`sessions.md`**, respond exactly: `No session summary generated (no substantive content); index updated.` (Same predicate as **Canned “no work” response** in step 5.)

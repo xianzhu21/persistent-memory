@@ -1,0 +1,7 @@
+{
+  "name": "persistent-memory",
+  "private": true,
+  "scripts": {
+    "test": "bun test"
+  }
+}

@@ -79,7 +79,7 @@ Reply with a number (1-2) to load one, or "all" for all shown.
 
 | Path | Purpose |
 |------|---------|
-| `~/.cursor/persistent-memory/sessions.md` | Index lines for conversations that have a written summary |
+| `~/.cursor/persistent-memory/sessions.md` | Catalog (GFM table) of conversations with summaries; saver **Catalog reconciliation** backfills missing rows from `summaries/*.md` each run |
 | `~/.cursor/persistent-memory/incremental-index.json` | Per-transcript absolute path → `mtimeMs`, `lastProcessedAt` |
 | `~/.cursor/persistent-memory/incremental-index-*.json` | Optional **manual** snapshots; the save skill may consult them when merging index history |
 | `~/.cursor/persistent-memory/summaries/` | `{conversation_id}.md` structured summaries |
@@ -99,6 +99,8 @@ Each **non-duplicate** Stop (after `generation_id` dedupe and cadence updates) c
 `| {conversation_id[:8]} | {start} | {end} | {title} | {tags} |`
 
 The **Tags** cell starts with a **`#project-<slug>`** tag: same **canonical** dirname for **Open Folder** and **Open `.code-workspace`** — after stripping `-code-workspace`, walk **`k` = 1,2,…** trailing segments as workspace stem until **`~/.cursor/projects/{base}/agent-transcripts`** exists, else fall back to one segment; then normalize — see `agents/persistent-memory-saver.md`. Up to three topic tags follow. That lets `/persistent-memory-retrieve` match **this repo** in either window mode.
+
+Each **`persistent-memory-save`** run reconciles the table to on-disk **`summaries/*.md`**: if a summary file exists but no row shares its **`conversation_id[:8]`**, the saver adds a row from that file’s H1 and **`## Tags`** (no JSONL re-read), then re-sorts by **`End`**. That heals gaps from partial runs, git skew, or hand edits. Reconciliation **adds** missing rows only; it does **not** drop **`sessions.md`** rows when a summary file was deleted—see **Catalog completeness (forward-only)** in `agents/persistent-memory-saver.md`.
 
 Escape literal `|` in a cell as `\|`. **persistent-memory-retrieve** also accepts legacy plain lines (same five fields without table markup, or four-field lines without separate start).
 
