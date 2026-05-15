@@ -1,6 +1,6 @@
 /// <reference types="bun-types-no-globals/lib/index.d.ts" />
 
-import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { stdin } from "bun";
 
@@ -33,8 +33,7 @@ interface ConversationCadence {
   trialStartedAtMs: number | null;
 }
 
-interface PersistentMemoryStateV2 {
-  version: 2;
+interface PersistentMemoryState {
   conversations: Record<string, ConversationCadence>;
 }
 
@@ -95,7 +94,7 @@ function conversationActivityAnchorMs(c: ConversationCadence): number {
   return 0;
 }
 
-function pruneStaleConversations(state: PersistentMemoryStateV2, nowMs: number, activeKey: string): void {
+function pruneStaleConversations(state: PersistentMemoryState, nowMs: number, activeKey: string): void {
   const maxAgeMs = parsePruneMaxAgeMs();
   if (maxAgeMs === null) return;
   for (const id of Object.keys(state.conversations)) {
@@ -108,33 +107,24 @@ function pruneStaleConversations(state: PersistentMemoryStateV2, nowMs: number, 
   }
 }
 
-function saveState(state: PersistentMemoryStateV2): void {
+function saveState(state: PersistentMemoryState): void {
   const directory = dirname(STATE_PATH);
   if (!existsSync(directory)) mkdirSync(directory, { recursive: true });
   writeFileSync(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`, "utf-8");
 }
 
-function loadState(): PersistentMemoryStateV2 {
-  const empty: PersistentMemoryStateV2 = { version: 2, conversations: {} };
+function loadState(): PersistentMemoryState {
+  const empty: PersistentMemoryState = { conversations: {} };
   if (!existsSync(STATE_PATH)) return empty;
   try {
     const p = JSON.parse(readFileSync(STATE_PATH, "utf-8")) as Record<string, unknown>;
-    if (p.version === 1) {
-      try {
-        unlinkSync(STATE_PATH);
-      } catch {
-        /* ignore */
-      }
-      saveState(empty);
-      return empty;
-    }
     const raw = p.conversations;
-    if (p.version !== 2 || !raw || typeof raw !== "object" || Array.isArray(raw)) return empty;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return empty;
     const conversations: Record<string, ConversationCadence> = {};
     for (const [id, entry] of Object.entries(raw as Record<string, unknown>)) {
       if (id && entry && typeof entry === "object") conversations[id] = normalizeConv(entry as Partial<ConversationCadence>);
     }
-    return { version: 2, conversations };
+    return { conversations };
   } catch {
     return empty;
   }
